@@ -27,8 +27,8 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         uint64 startTs;
         uint64 endTs;
     }
-    mapping(uint256 => Product) products;
-    uint256 numProducts;
+    mapping(uint256 => Product) public products;
+    uint256 public numProducts;
 
     constructor() ERC1155("") {}
 
@@ -53,8 +53,6 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         _mint(owner(), numProducts, _initialSupply, "");
         numProducts++;
     }
-
-    // TODO: Q. Do weed need get function for product data?
 
     function uri(uint256 _id) public view override returns (string memory) {
         return products[_id].uri;
