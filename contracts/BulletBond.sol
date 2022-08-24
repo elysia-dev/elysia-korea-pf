@@ -18,18 +18,19 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
     error EarlyClaim(address _from, uint256 _id);
     error ZeroBalanceWithdraw(uint256 _id);
     error EarlyWithdraw();
+    error InvalidFinalValue();
+    error NotRepaid(uint256 _id);
 
     struct Product {
         address token;
         uint256 value; // WAD, e.g. $100
-        uint256 rateInRay; // RAY, e.g. 20% -> 2 * 10**26
+        uint256 finalValue; // WAD
         string uri;
         uint64 startTs;
         uint64 endTs;
     }
     mapping(uint256 => Product) products;
     uint256 numProducts;
-    uint256 internal constant SECONDSPERYEAR = 365 days;
 
     constructor() ERC1155("") {}
 
@@ -37,7 +38,6 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         uint256 _initialSupply,
         address _token,
         uint256 _value,
-        uint256 _rateInRay,
         string memory _uri,
         uint64 _startTs,
         uint64 _endTs
@@ -45,7 +45,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         Product memory newProduct = Product({
             token: _token,
             value: _value,
-            rateInRay: _rateInRay,
+            finalValue: 0,
             uri: _uri,
             startTs: _startTs,
             endTs: _endTs
@@ -67,25 +67,25 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
     }
 
     /// @notice Admin repays the
-    function repay(uint256 _id) external {
+    function repay(
+        uint256 _id,
+        uint256 _finalValue,
+        uint256 _totalFinalValue
+    ) external {
         Product memory product = products[_id];
-        uint256 repayAmount = (product.value * totalSupply(_id)).rayMul(
-            _calculateLinearInterest(
-                product.rateInRay,
-                product.startTs,
-                product.endTs
-            )
-        );
+        product.finalValue = _totalFinalValue / totalSupply(_id);
+        if (_finalValue != product.finalValue) revert InvalidFinalValue();
         IERC20(product.token).safeTransferFrom(
             _msgSender(),
             address(this),
-            repayAmount
+            _totalFinalValue
         );
     }
 
     /// @notice Transfer the nft holder
     function claim(address _to, uint256 _id) external {
         Product memory product = products[_id];
+        if (product.finalValue == 0) revert NotRepaid(_id);
         if (block.timestamp < product.endTs)
             revert EarlyClaim(_msgSender(), _id);
 
@@ -93,13 +93,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         if (balance == 0) revert ZeroBalanceClaim();
         _burn(_to, _id, balance);
 
-        uint256 receiveAmount = (product.value * balance).rayMul(
-            _calculateLinearInterest(
-                product.rateInRay,
-                product.startTs,
-                product.endTs
-            )
-        );
+        uint256 receiveAmount = product.finalValue * balance;
         IERC20(product.token).safeTransfer(_to, receiveAmount);
     }
 
@@ -107,28 +101,14 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
     /// NOTE: Do not _burn to allow users claim later.
     function withdrawResidue(uint256 _id) external onlyOwner {
         Product memory product = products[_id];
+        if (product.finalValue == 0) revert NotRepaid(_id);
         if (block.timestamp < product.endTs + 8 weeks) revert EarlyWithdraw();
 
         uint256 balance = totalSupply(_id);
         if (balance == 0) revert ZeroBalanceWithdraw(_id);
 
-        uint256 withdrawAmount = (product.value * balance).rayMul(
-            _calculateLinearInterest(
-                product.rateInRay,
-                product.startTs,
-                product.endTs
-            )
-        );
+        uint256 withdrawAmount = product.finalValue * balance;
         IERC20(product.token).safeTransfer(owner(), withdrawAmount);
-    }
-
-    function _calculateLinearInterest(
-        uint256 _rate,
-        uint256 _startTs,
-        uint256 _endTs
-    ) internal pure returns (uint256) {
-        uint256 timeDelta = _endTs - _startTs;
-        return ((_rate * timeDelta) / SECONDSPERYEAR) + WadRayMath.RAY;
     }
 
     function _beforeTokenTransfer(
