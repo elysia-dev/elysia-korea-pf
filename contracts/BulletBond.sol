@@ -64,15 +64,17 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         products[_id].uri = _uri;
     }
 
-    /// @notice Admin repays the
+    /// @notice Admin repays to let users claim. You can repay several times because all `_finalValue`s are summed up.
     function repay(
         uint256 _id,
         uint256 _finalValue,
         uint256 _totalFinalValue
     ) external {
         Product memory product = products[_id];
-        product.finalValue = _totalFinalValue / totalSupply(_id);
-        if (_finalValue != product.finalValue) revert InvalidFinalValue();
+        if (_finalValue * totalSupply(_id) != _totalFinalValue)
+            revert InvalidFinalValue();
+        product.finalValue += _finalValue;
+
         IERC20(product.token).safeTransferFrom(
             _msgSender(),
             address(this),
