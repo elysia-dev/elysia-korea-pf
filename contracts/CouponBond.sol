@@ -90,7 +90,7 @@ contract CouponBond is
     /// @notice Nft holders claim their interest.
     /// NOTE: Users with zero balance are also able to claim.
     function claim(address _to, uint256 _id) external whenNotPaused {
-        Product memory product = products[_id];
+        Product storage product = products[_id];
 
         _updateInterest(_to, _id);
 
@@ -122,7 +122,7 @@ contract CouponBond is
     /// @notice Admin withdraws the money to repay later when users do not claim for a long time.
     /// NOTE: Do not _burn to allow users claim later.
     function withdrawResidue(uint256 _id, uint256 _amount) external onlyOwner {
-        Product memory product = products[_id];
+        Product storage product = products[_id];
         if (!product.repaid) revert NotRepaid(_id);
         if (block.timestamp < product.endTs + 8 weeks) revert EarlyWithdraw();
 
@@ -137,7 +137,7 @@ contract CouponBond is
         view
         returns (uint256)
     {
-        Product memory product = products[_id];
+        Product storage product = products[_id];
         if (product.startTs < 0) return 0;
         uint256 userLastUpdatedTs = lastUpdatedTs[_id][_to];
 
@@ -191,7 +191,7 @@ contract CouponBond is
     }
 
     function _updateInterest(address _to, uint256 _id) internal {
-        Product memory product = products[_id];
+        Product storage product = products[_id];
         if (block.timestamp <= product.startTs) return;
 
         uint256 rate = product.interestPerTokenInSecond;

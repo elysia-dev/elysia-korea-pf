@@ -22,8 +22,8 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
 
     struct Product {
         address token;
-        uint256 value; // WAD, e.g. $100
-        uint256 finalValue; // WAD
+        uint256 value; // use decimal of the given token. e.g. USDT in BSC -> 18
+        uint256 finalValue; // use decimal of the given token. e.g. USDT in BSC -> 18
         string uri;
         uint64 startTs;
         uint64 endTs;
@@ -78,7 +78,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
         uint256 _finalValue,
         uint256 _totalFinalValue
     ) external whenNotPaused {
-        Product memory product = products[_id];
+        Product storage product = products[_id];
         if (_finalValue * totalSupply(_id) != _totalFinalValue)
             revert InvalidFinalValue();
         product.finalValue += _finalValue;
@@ -92,7 +92,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
 
     /// @notice Nft holders claim their interest and principal.
     function claim(address _to, uint256 _id) external whenNotPaused {
-        Product memory product = products[_id];
+        Product storage product = products[_id];
         if (product.finalValue == 0) revert NotRepaid(_id);
         if (block.timestamp < product.endTs)
             revert EarlyClaim(_msgSender(), _id);
@@ -108,7 +108,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
     /// @notice Admin withdraws the money to repay later when users do not claim for a long time.
     /// NOTE: Do not _burn to allow users claim later.
     function withdrawResidue(uint256 _id) external onlyOwner {
-        Product memory product = products[_id];
+        Product storage product = products[_id];
         if (product.finalValue == 0) revert NotRepaid(_id);
         if (block.timestamp < product.endTs + 8 weeks) revert EarlyWithdraw();
 

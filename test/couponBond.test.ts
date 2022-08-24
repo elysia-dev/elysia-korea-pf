@@ -13,7 +13,6 @@ describe("CouponBond", function () {
   describe("#mint", function () {
     it("should give", async function () {
       const { couponBond } = await loadFixture(deployCouponBond);
-      console.log(await couponBond.products(0));
     });
   });
 
