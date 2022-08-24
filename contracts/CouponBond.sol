@@ -3,13 +3,19 @@ pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/WadRayMath.sol";
 
 /// @notice This repays the interest monthly. At the maturity date, lenders receive the principal and one-month interest.
-contract CouponBond is ERC1155Supply, ERC1155Burnable, Ownable {
+contract CouponBond is
+    ERC1155Supply,
+    ERC1155Burnable,
+    ERC1155Pausable,
+    Ownable
+{
     using SafeERC20 for IERC20;
     using WadRayMath for uint256;
 
@@ -35,7 +41,15 @@ contract CouponBond is ERC1155Supply, ERC1155Burnable, Ownable {
     mapping(uint256 => mapping(address => uint256)) public lastUpdatedTs;
     mapping(uint256 => mapping(address => uint256)) public unclaimedInterest;
 
-    constructor() ERC1155("") {}
+    constructor() ERC1155("") Pausable() {}
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function addProduct(
         uint256 _initialSupply,
@@ -75,7 +89,7 @@ contract CouponBond is ERC1155Supply, ERC1155Burnable, Ownable {
 
     /// @notice Nft holders claim their interest.
     /// NOTE: Users with zero balance are also able to claim.
-    function claim(address _to, uint256 _id) external {
+    function claim(address _to, uint256 _id) external whenNotPaused {
         Product memory product = products[_id];
 
         _updateInterest(_to, _id);
@@ -143,9 +157,23 @@ contract CouponBond is ERC1155Supply, ERC1155Burnable, Ownable {
         uint256[] memory ids,
         uint256[] memory amounts,
         bytes memory data
-    ) internal virtual override(ERC1155, ERC1155Supply) {
-        // Use ERC1155Supply._beforeTokenTransfer
-        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+    ) internal virtual override(ERC1155, ERC1155Supply, ERC1155Pausable) {
+        ERC1155Pausable._beforeTokenTransfer(
+            operator,
+            from,
+            to,
+            ids,
+            amounts,
+            data
+        );
+        ERC1155Supply._beforeTokenTransfer(
+            operator,
+            from,
+            to,
+            ids,
+            amounts,
+            data
+        );
 
         if (from != address(0)) {
             for (uint256 i = 0; i < ids.length; ++i) {

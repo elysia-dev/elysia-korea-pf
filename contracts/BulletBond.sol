@@ -3,13 +3,14 @@ pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @notice This repays the interest & principal at once until the maturity date.
 /// This contract has no need to The admin mint and sell NFT
-contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
+contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
     using SafeERC20 for IERC20;
 
     error ZeroBalanceClaim();
@@ -27,10 +28,19 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         uint64 startTs;
         uint64 endTs;
     }
+
     mapping(uint256 => Product) public products;
     uint256 public numProducts;
 
-    constructor() ERC1155("") {}
+    constructor() ERC1155("") Pausable() {}
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function addProduct(
         uint256 _initialSupply,
@@ -67,7 +77,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         uint256 _id,
         uint256 _finalValue,
         uint256 _totalFinalValue
-    ) external {
+    ) external whenNotPaused {
         Product memory product = products[_id];
         if (_finalValue * totalSupply(_id) != _totalFinalValue)
             revert InvalidFinalValue();
@@ -81,7 +91,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
     }
 
     /// @notice Nft holders claim their interest and principal.
-    function claim(address _to, uint256 _id) external {
+    function claim(address _to, uint256 _id) external whenNotPaused {
         Product memory product = products[_id];
         if (product.finalValue == 0) revert NotRepaid(_id);
         if (block.timestamp < product.endTs)
@@ -116,7 +126,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         uint256[] memory ids,
         uint256[] memory amounts,
         bytes memory data
-    ) internal virtual override(ERC1155, ERC1155Supply) {
+    ) internal virtual override(ERC1155, ERC1155Supply) whenNotPaused {
         // Use ERC1155Supply._beforeTokenTransfer
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
