@@ -82,7 +82,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
         );
     }
 
-    /// @notice Transfer the nft holder
+    /// @notice Nft holders claim their interest and principal.
     function claim(address _to, uint256 _id) external {
         Product memory product = products[_id];
         if (product.finalValue == 0) revert NotRepaid(_id);
