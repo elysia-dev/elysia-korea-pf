@@ -6,13 +6,11 @@ import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./libraries/WadRayMath.sol";
 
 /// @notice This repays the interest & principal at once until the maturity date.
 /// This contract has no need to The admin mint and sell NFT
 contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable {
     using SafeERC20 for IERC20;
-    using WadRayMath for uint256;
 
     error ZeroBalanceClaim();
     error EarlyClaim(address _from, uint256 _id);
