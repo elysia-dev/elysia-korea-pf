@@ -1,9 +1,9 @@
-import * as dotenv from "dotenv";
+import "dotenv/config";
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-deploy";
+import "./tasks";
 
-dotenv.config();
 const config: HardhatUserConfig = {
   solidity: "0.8.9",
   namedAccounts: {

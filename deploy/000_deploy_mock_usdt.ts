@@ -4,14 +4,11 @@ const deploy: DeployFunction = async function (hre) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  await deploy("BulletBond", {
+  await deploy("Usdt", {
+    contract: "MockERC20",
     from: deployer,
     args: [],
     log: true,
-  });
-
-  await hre.run("etherscan-verify", {
-    network: hre.network.name,
   });
 };
 
