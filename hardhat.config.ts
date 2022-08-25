@@ -17,20 +17,24 @@ const config: HardhatUserConfig = {
       chainId: 1,
       // gasPrice: 20000000000, // 20 gwei
     },
-    rinkeby: {
-      url: `https://eth-rinkeby.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+    bsc: {
+      url: "https://bsc-dataseed.binance.org/",
+      chainId: 56,
+      gasPrice: 20000000000,
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
-    goerli: {
-      url: `https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+    bscTestnet: {
+      url: "https://data-seed-prebsc-1-s1.binance.org:8545",
+      chainId: 97,
+      gasPrice: 20000000000,
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-    },
-    elyfi_test: {
-      url: "https://elyfi-test.elyfi.world:8545",
-      chainId: 1337,
-      tags: ["staging"], // hardhat-deploy config
+      verify: {
+        etherscan: {
+          apiKey: process.env.BSCSCAN_API_KEY || "",
+        },
+      },
     },
   },
 };
