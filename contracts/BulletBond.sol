@@ -77,7 +77,7 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
         uint256 _id,
         uint256 _finalValue,
         uint256 _totalFinalValue
-    ) external whenNotPaused {
+    ) external whenNotPaused onlyOwner {
         Product storage product = products[_id];
         if (_finalValue * totalSupply(_id) != _totalFinalValue)
             revert InvalidFinalValue();
