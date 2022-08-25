@@ -1,0 +1,14 @@
+output: mythx.json
+format: json
+
+analyze:
+  mode: standard
+  create-group: true
+  group-name: elysia-korea-pf
+  solc: 0.8.9
+  remappings:
+    - "@openzeppelin/=./node_modules/@openzeppelin/"
+  targets:
+    - contracts/BulletBond.sol
+    - contracts/CouponBond.sol
+    - contracts/libraries
