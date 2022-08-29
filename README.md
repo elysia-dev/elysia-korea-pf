@@ -11,3 +11,8 @@ GAS_REPORT=true npx hardhat test
 npx hardhat node
 npx hardhat run scripts/deploy.ts
 ```
+## Verify
+Use https://github.com/wighawag/hardhat-deploy#4-hardhat-etherscan-verify.
+```sh
+yarn hardhat etherscan-verify --network bscTestnet --api-key $BSCSCAN_API_KEY
+```
