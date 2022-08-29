@@ -1,0 +1,51 @@
+{
+  "name": "Bond NFT",
+  "description": "Right to receive principal and interest income. Bond NFT holders can receive principal and interest on the ELYFI site, www.elyfi.world, on the maturity date of the bond. Expected interest income is calculated from the execution date of the loan to the maturity date of the bond. Learn more on the ELYFI website.",
+  "image": "ipfs://QmYz39eco2xHegDDD9RngJXGPH6qddDixhNww1zTJQS99X",
+  "attributes": [
+    {
+      "display_type": "date",
+      "trait_type": "Expected Loan Date",
+      "value": 1662562800
+    },
+    {
+      "display_type": "date",
+      "trait_type": "Expected Maturity Date",
+      "value": 1694012400
+    },
+    {
+      "trait_type": "Average APR",
+      "value": "15%"
+    },
+    {
+      "trait_type": "Additional Overdue APR",
+      "value": "3%"
+    }
+  ],
+  "documents": [
+    {
+      "type": "Loan agreement",
+      "link": "ipfs://Qmb3SpPa14HfLDQynTHWk7Jea6R7tYyADuFK9SRCg9hZ6q"
+    },
+    {
+      "type": "Pledge agreement",
+      "link": "ipfs://QmYSLrvzVX8jjtdo2u6c3JtAKjmREx8dyQPV1gbqstcjJ5"
+    },
+    {
+      "type": "Loan notarized copy",
+      "link": "ipfs://QmWFVaTwPSRqPS14xzXezKMrAFq5tYeBx6Y2kPkHRNtsqV"
+    },
+    {
+      "type": "Certified copy of the housing register",
+      "link": "ipfs://QmP5xBnzrLfpvfL9uzj1GKVPCT3JQjaGfDJbT6rW9kx7kj"
+    },
+    {
+      "type": "Seoul Station Area Youth Housing Agreement",
+      "link": "ipfs://QmYSLrvzVX8jjtdo2u6c3JtAKjmREx8dyQPV1gbqstcjJ5"
+    },
+    {
+      "type": "PF Loan Agreement",
+      "link": "ipfs://QmeKJYvQoECHxfUvSHL5VzA2zuRXbmrhAkt3kEKTkKmTt3"
+    }
+  ]
+}

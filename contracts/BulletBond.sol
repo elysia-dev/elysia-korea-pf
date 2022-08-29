@@ -107,6 +107,9 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
 
     /// @notice Admin withdraws the money to repay later when users do not claim for a long time.
     /// NOTE: Do not _burn to allow users claim later.
+    /// Users can claim later as follows. The admin
+    /// 1. Admin transfers the stablecoin to this contract.
+    /// 2. The user claims.
     function withdrawResidue(uint256 _id) external onlyOwner {
         Product storage product = products[_id];
         if (product.finalValue == 0) revert NotRepaid(_id);
