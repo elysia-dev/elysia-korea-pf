@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./libraries/WadRayMath.sol";
 
 /// @notice This repays the interest monthly. At the maturity date, lenders receive the principal and one-month interest.
 contract CouponBond is
@@ -17,7 +16,6 @@ contract CouponBond is
     Ownable
 {
     using SafeERC20 for IERC20;
-    using WadRayMath for uint256;
 
     error ZeroBalanceClaim();
     error EarlyClaim(address _from, uint256 _id);
@@ -94,7 +92,7 @@ contract CouponBond is
 
         _updateInterest(_to, _id);
 
-        if (product.endTs < block.timestamp && product.repaid) {
+        if (product.endTs <= block.timestamp && product.repaid) {
             uint256 balance = balanceOf(_to, _id);
 
             // Both interest & principal
@@ -198,6 +196,8 @@ contract CouponBond is
         uint256 userLastUpdatedTs = lastUpdatedTs[_id][_to];
         if (userLastUpdatedTs == 0) {
             userLastUpdatedTs = product.startTs;
+        } else if (product.endTs < userLastUpdatedTs) {
+            userLastUpdatedTs = product.endTs;
         }
 
         uint256 currentTs = block.timestamp;
@@ -211,7 +211,6 @@ contract CouponBond is
         lastUpdatedTs[_id][_to] = block.timestamp;
     }
 
-    /// @param _rateInSecond RAY
     function _calculateInterest(
         uint256 _rateInSecond,
         uint256 _lastUpdatedTs,

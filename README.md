@@ -11,6 +11,20 @@ GAS_REPORT=true npx hardhat test
 npx hardhat node
 npx hardhat run scripts/deploy.ts
 ```
+
+## 대출 정보
+- 대출 시작일: 2022-09-08 GMT+0900
+- 대출 만기일: 2022-09-07 GMT+0900
+
+## Test
+```sh
+# BulletBond
+yarn hardhat test
+
+# CouponBond
+forge test -vv
+```
+
 ## Verify
 Use https://github.com/wighawag/hardhat-deploy#4-hardhat-etherscan-verify.
 ```sh
