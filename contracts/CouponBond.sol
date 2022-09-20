@@ -91,11 +91,6 @@ contract CouponBond is
         products[_id].uri = _uri;
     }
 
-    /// @dev just in case
-    function setRepaid(uint256 _id) external onlyOwner {
-        products[_id].repaidTs = uint64(block.timestamp);
-    }
-
     function isRepaid(uint256 _id) public view returns (bool) {
         return products[_id].repaidTs != 0;
     }
