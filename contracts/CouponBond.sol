@@ -162,26 +162,21 @@ contract CouponBond is
             uint256 balance = balanceOf(_to, _id);
 
             // Both interest & principal
-            uint256 receiveAmount = (product.value * balance) +
+            receiveAmount =
+                (product.value * balance) +
                 unclaimedInterest[_id][_to];
 
-            unclaimedInterest[_id][_to] = 0;
-            lastUpdatedTs[_id][_to] = block.timestamp;
-
-            // burn
-            _burn(_to, _id, balance);
-            product.repaidBalance -= balance * getUnitDebt(_id);
-
-            IERC20(product.token).safeTransfer(_to, receiveAmount);
+            _burn(_to, _id, 1);
         } else {
             // only interest
-            uint256 receiveAmount = unclaimedInterest[_id][_to];
-
-            unclaimedInterest[_id][_to] = 0;
-            lastUpdatedTs[_id][_to] = block.timestamp;
-
-            IERC20(product.token).safeTransfer(_to, receiveAmount);
+            receiveAmount = unclaimedInterest[_id][_to];
         }
+
+        unclaimedInterest[_id][_to] = 0;
+        lastUpdatedTs[_id][_to] = block.timestamp;
+
+        product.tokenBalance -= receiveAmount;
+        IERC20(product.token).safeTransfer(_to, receiveAmount);
     }
 
     /*
