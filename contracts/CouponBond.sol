@@ -97,6 +97,10 @@ contract CouponBond is
 
     /// @dev It is not able to repay after fully repaying the loan.
     /// The caller need to approve the repaying token.
+    /// There are 3 cases.
+    /// 1. block.timestamp < startTimestamp: repay only the principal.
+    /// 2. startTs <= block.timestamp <= endTs: repay principal + interest
+    /// 3. endTs < block.timestamp: repay principal + interest + overdue interest
     /// @param _id token id
     /// @param _amount amount of token to repay. type(uint256).max means to repay all.
     function repay(uint256 _id, uint256 _amount) external {

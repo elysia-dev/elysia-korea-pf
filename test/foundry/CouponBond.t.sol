@@ -118,17 +118,28 @@ contract CouponBondTest is Test {
         assertEq(couponBond.totalSupply(id), totalSupply - aliceBalance);
     }
 
-    function testRepayBeforeStart() public {
-        // TODO: just repay the principal;
+    function testRepayAllBeforeStart() public {
+        vm.warp(startTs - 100);
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, type(uint256).max);
+
+        assertEq(
+            usdt.balanceOf(address(couponBond)),
+            totalSupply * principalPerToken
+        );
     }
 
     function testRepayGivenAmount() public {
+        vm.warp(startTs + 100);
         uint256 repayingAmount = 1e18;
+
         usdt.approve(address(couponBond), type(uint256).max);
-        console2.log("owner usdt balance: %d", usdt.balanceOf(owner));
         couponBond.repay(id, repayingAmount);
 
+        (, , , , , uint256 tokenBalance, , , ) = couponBond.products(id);
+
         assertEq(usdt.balanceOf(address(couponBond)), repayingAmount);
+        assertEq(usdt.balanceOf(address(couponBond)), tokenBalance);
     }
 
     function testRepayBeforeStartTs() public {
@@ -146,6 +157,12 @@ contract CouponBondTest is Test {
     function testOverdueRepay() public {
         // TODO: everybody claims
     }
+
+    // TODO: Test getUnitDebt: 3가지 케이스
+    function testGetUnitDebt() public {}
+
+    // TODO: Test getUnpaidDebt
+    function testGetUnpaidDebt() public {}
 
     /*
     function testWithdrawResidue() public {
@@ -175,8 +192,4 @@ contract CouponBondTest is Test {
         assertEq(usdt.balanceOf(owner), withdrawAmount + usdtBeforeBalance);
     }
     */
-
-    // TODO: Test getUnitDebt: 3가지 케이스
-
-    // TODO: Test getUnpaidDebt
 }
