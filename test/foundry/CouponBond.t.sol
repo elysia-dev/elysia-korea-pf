@@ -39,6 +39,8 @@ contract CouponBondTest is Test {
             endTs
         );
 
+        assertEq(couponBond.totalSupply(id), totalSupply);
+
         couponBond.safeTransferFrom(owner, alice, id, aliceBalance, "");
         couponBond.safeTransferFrom(owner, bob, id, bobBalance, "");
     }
@@ -88,10 +90,22 @@ contract CouponBondTest is Test {
         assertEq(usdt.balanceOf(alice), principalPerToken + totalInterest);
     }
 
-    // FIXME: this causes an underflow error.
-    // repay하고 나면 claim했을 때 burn 되어 product.repaidBalance 가 더 커지는 문제
-    // test: repay all -> claim -> repay all
-    function testRepayTwice() public {}
+    // Scenario: repay all -> claim -> repay all
+    function testRepayTwice(uint64 elapsed) public {
+        vm.assume(elapsed <= 36500 days); // no invalid timestamp
+        vm.warp(endTs + elapsed);
+
+        // 1. repay all
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, type(uint256).max);
+
+        // 2. claim: burn alice's tokens
+        couponBond.claim(alice, id);
+
+        // 3. repay all
+        vm.expectRevert(abi.encodeWithSignature("AlreadyRepaid(uint256)", id));
+        couponBond.repay(id, type(uint256).max);
+    }
 
     function testBurnTokenWhenClaimAfterRepay() public {
         vm.warp(endTs + 100);
@@ -101,6 +115,7 @@ contract CouponBondTest is Test {
         couponBond.claim(alice, id);
 
         assertEq(couponBond.balanceOf(alice, id), 0);
+        assertEq(couponBond.totalSupply(id), totalSupply - aliceBalance);
     }
 
     function testRepayBeforeStart() public {
@@ -132,6 +147,7 @@ contract CouponBondTest is Test {
         // TODO: everybody claims
     }
 
+    /*
     function testWithdrawResidue() public {
         uint256 withdrawAmount = 1e18; // arbitrary amount less than the balance of the coupondBond contract
         uint256 beforeBalance = couponBond.balanceOf(alice, id);
@@ -158,6 +174,7 @@ contract CouponBondTest is Test {
         // Check if usdt withdrawed.
         assertEq(usdt.balanceOf(owner), withdrawAmount + usdtBeforeBalance);
     }
+    */
 
     // TODO: Test getUnitDebt: 3가지 케이스
 

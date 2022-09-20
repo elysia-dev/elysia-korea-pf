@@ -35,7 +35,7 @@ contract CouponBond is
         uint256 interestRate;
         uint256 overdueRate;
         string uri;
-        uint256 repaidBalance;
+        uint256 tokenBalance;
         uint64 startTs;
         uint64 endTs;
         uint64 repaidTs;
@@ -72,7 +72,7 @@ contract CouponBond is
             interestRate: _interestRate,
             overdueRate: _overdueRate,
             uri: _uri,
-            repaidBalance: 0,
+            tokenBalance: 0,
             startTs: _startTs,
             endTs: _endTs,
             repaidTs: 0
@@ -95,23 +95,23 @@ contract CouponBond is
         return products[_id].repaidTs != 0;
     }
 
-    /// @dev Need to approve
+    /// @dev It is not able to repay after fully repaying the loan.
+    /// The caller need to approve the repaying token.
     /// @param _id token id
     /// @param _amount amount of token to repay. type(uint256).max means to repay all.
     function repay(uint256 _id, uint256 _amount) external {
         Product storage product = products[_id];
         uint256 repayingAmount = _amount;
 
-        uint256 unpaidDebt = getUnpaidDebt(_id);
-
         if (isRepaid(_id)) revert AlreadyRepaid(_id);
 
+        uint256 unpaidDebt = getUnpaidDebt(_id);
         if (_amount == type(uint256).max) {
             repayingAmount = unpaidDebt;
         }
 
-        product.repaidBalance += repayingAmount;
-        if (unpaidDebt <= product.repaidBalance) {
+        product.tokenBalance += repayingAmount;
+        if (unpaidDebt <= product.tokenBalance) {
             product.repaidTs = uint64(block.timestamp);
         }
 
@@ -147,14 +147,14 @@ contract CouponBond is
     function getUnpaidDebt(uint256 _id) public view returns (uint256) {
         Product storage product = products[_id];
         // NOTE: ERC-1155 totalSupply has no decimal.
-        return totalSupply(_id) * getUnitDebt(_id) - product.repaidBalance;
+        return totalSupply(_id) * getUnitDebt(_id) - product.tokenBalance;
     }
 
     /// @notice Nft holders claim their interest.
     /// NOTE: Users with zero balance are also able to claim.
-    // TODO: overdue rate
     function claim(address _to, uint256 _id) external whenNotPaused {
         Product storage product = products[_id];
+        uint256 receiveAmount;
 
         _updateInterest(_to, _id);
 
@@ -184,6 +184,7 @@ contract CouponBond is
         }
     }
 
+    /*
     /// @notice Admin withdraws the money to repay later when users do not claim for a long time.
     /// @param _id token id
     /// @param _amount the amount of token to withdraw
@@ -196,10 +197,11 @@ contract CouponBond is
         uint256 balance = totalSupply(_id);
         if (balance == 0) revert ZeroBalanceWithdraw(_id);
 
+        product.tokenBalance -= _amount;
         IERC20(product.token).safeTransfer(owner(), _amount);
     }
+    */
 
-    // TODO: add overdue interest
     function getInterest(address _to, uint256 _id)
         public
         view
@@ -228,22 +230,7 @@ contract CouponBond is
         uint256[] memory amounts,
         bytes memory data
     ) internal virtual override(ERC1155, ERC1155Supply, ERC1155Pausable) {
-        ERC1155Pausable._beforeTokenTransfer(
-            operator,
-            from,
-            to,
-            ids,
-            amounts,
-            data
-        );
-        ERC1155Supply._beforeTokenTransfer(
-            operator,
-            from,
-            to,
-            ids,
-            amounts,
-            data
-        );
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
 
         if (from != address(0)) {
             for (uint256 i = 0; i < ids.length; ++i) {
