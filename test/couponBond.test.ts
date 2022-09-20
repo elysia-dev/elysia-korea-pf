@@ -1,18 +1,34 @@
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { ethers } from "hardhat";
 
-// TODO:
 describe("CouponBond", function () {
   async function deployCouponBond() {
+    const [owner, alice] = await ethers.getSigners();
+
     const CouponBond = await ethers.getContractFactory("CouponBond");
     const couponBond = await CouponBond.deploy();
 
-    return { couponBond };
+    const Usdt = await ethers.getContractFactory("MockERC20");
+    const usdt = await Usdt.deploy();
+
+    return { couponBond, usdt, owner, alice };
   }
 
   describe("#addProduct", function () {
     it("should give", async function () {
-      const { couponBond } = await loadFixture(deployCouponBond);
+      const startTs = 1662562800; // 2022-09-08 GMT+0900
+      const endTs = 1694012400; // 2022-09-07 GMT+0900
+      const { couponBond, usdt } = await loadFixture(deployCouponBond);
+      /*
+      await couponBond.addProduct(
+        1000,
+        usdt.address,
+        ethers.utils.parseEther("100"), // bsc USDT or BUSD both use decimal 18, each token are worth $100.
+        "ipfs://testuri",
+        startTs,
+        endTs
+      );
+      */
     });
   });
 
