@@ -10,13 +10,6 @@ const config: HardhatUserConfig = {
     deployer: 0,
   },
   networks: {
-    mainnet: {
-      url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-      chainId: 1,
-      // gasPrice: 20000000000, // 20 gwei
-    },
     bsc: {
       url: "https://bsc-dataseed.binance.org/",
       chainId: 56,

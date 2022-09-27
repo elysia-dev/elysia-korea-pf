@@ -1,2 +1,3 @@
-export * from "./addProduct";
+export * from "./addBulletProduct";
+export * from "./addCouponProduct";
 export * from "./airdrop";
