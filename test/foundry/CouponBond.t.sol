@@ -20,10 +20,28 @@ contract CouponBondTest is Test {
     address alice = address(0x2);
     address bob = address(0x3);
 
-    uint256 aliceBalance = 1;
+    mapping(address => uint256) balances;
+    mapping(address => uint256) interests;
     uint256 bobBalance = 100;
 
+    function _everybodyClaims() internal {
+        // Everybody claims
+        changePrank(alice);
+        couponBond.claim(alice, id);
+
+        changePrank(owner);
+        couponBond.claim(owner, id);
+
+        changePrank(bob);
+        couponBond.claim(bob, id);
+
+        changePrank(owner);
+    }
+
     function setUp() public {
+        balances[alice] = 1;
+        balances[bob] = 100;
+
         vm.startPrank(owner);
         usdt = new MockERC20();
 
@@ -41,8 +59,8 @@ contract CouponBondTest is Test {
 
         assertEq(couponBond.totalSupply(id), totalSupply);
 
-        couponBond.safeTransferFrom(owner, alice, id, aliceBalance, "");
-        couponBond.safeTransferFrom(owner, bob, id, bobBalance, "");
+        couponBond.safeTransferFrom(owner, alice, id, balances[alice], "");
+        couponBond.safeTransferFrom(owner, bob, id, balances[bob], "");
     }
 
     // N seconds elapsed but it's still before endTs -> claim
@@ -56,7 +74,7 @@ contract CouponBondTest is Test {
         couponBond.claim(alice, id);
 
         assertEq(usdt.balanceOf(alice), interestRate * elapsed); // interest transferred
-        assertEq(couponBond.balanceOf(alice, id), aliceBalance); // Not burned
+        assertEq(couponBond.balanceOf(alice, id), balances[alice]); // Not burned
 
         couponBond.claim(alice, id);
         assertEq(usdt.balanceOf(alice), interestRate * elapsed); // No duplicate interest
@@ -115,7 +133,7 @@ contract CouponBondTest is Test {
         couponBond.claim(alice, id);
 
         assertEq(couponBond.balanceOf(alice, id), 0);
-        assertEq(couponBond.totalSupply(id), totalSupply - aliceBalance);
+        assertEq(couponBond.totalSupply(id), totalSupply - balances[alice]);
     }
 
     function testRepayAllBeforeStart() public {
@@ -127,8 +145,11 @@ contract CouponBondTest is Test {
             usdt.balanceOf(address(couponBond)),
             totalSupply * principalPerToken
         );
+
+        _everybodyClaims();
     }
 
+    // Check: Update product.tokenBalance
     function testRepayGivenAmount() public {
         vm.warp(startTs + 100);
         uint256 repayingAmount = 1e18;
@@ -142,20 +163,47 @@ contract CouponBondTest is Test {
         assertEq(usdt.balanceOf(address(couponBond)), tokenBalance);
     }
 
-    function testRepayBeforeStartTs() public {
-        // TODO: repay before startTs
-    }
+    /*
+    function testRepayAllBeforeEndTs() public {
+        vm.warp(endTs - 100);
+        uint256 totalDebt = principalPerToken * totalSupply;
+        uint256 duration = endTs - startTs - 3;
 
-    function testRepayBeforeEndTs() public {}
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, type(uint256).max);
+        deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
 
-    function testRepayGivenUintMax() public {
-        // TODO: everybody claims
+        _everybodyClaims();
         // Check if it is the same with the below.
         // usdt.transfer(address(couponBond), 130 * 1000 * 1e18); // 30% interest i.e. $100 -> $130
+        assertEq(usdt.balanceOf(alice), interests[alice]);
+        assertEq(usdt.balanceOf(bob), interests[bob]);
+        assertEq(usdt.balanceOf(owner), interests[owner]);
+
+        vm.warp(endTs);
+        _everybodyClaims();
+        assertEq(
+            usdt.balanceOf(alice),
+            interests[alice] + balances[alice] * principalPerToken
+        );
+        assertEq(
+            usdt.balanceOf(bob),
+            interests[alice] + balances[bob] * principalPerToken
+        );
+        assertEq(
+            usdt.balanceOf(owner),
+            interests[owner] * balances[owner] * principalPerToken
+        );
+
+        (duration / (endTs - startTs)) * 30 * 1000;
     }
+    */
 
     function testOverdueRepay() public {
         // TODO: everybody claims
+        // TODO: Check the interest is added when overdue
+
+        _everybodyClaims();
     }
 
     // TODO: Test getUnitDebt: 3가지 케이스

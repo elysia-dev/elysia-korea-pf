@@ -25,15 +25,15 @@ contract CouponBond is
     error NotRepaid(uint256 _id);
     error AlreadyRepaid(uint256 _id);
 
-    /// @param value        value per token in WAD, e.g. $100
-    /// @param interestRate interest rate per token in second. WAD. e.g. 15%
-    /// @param overdueRate  additional interest rate per token when overdue. WAD. e.g. 3% -> total 18% when overdue
-    /// @param repaidBalance total amount of token repaid. decimal is the same with `token`.
+    /// @param value                    value per token in WAD, e.g. $100
+    /// @param interestPerSecond            interest rate per token in second. WAD. e.g. 15%
+    /// @param overdueInterestPerSecond additional interest rate per token when overdue. WAD. e.g. 3% -> total 18% when overdue
+    /// @param repaidBalance            total amount of token repaid. decimal is the same with `token`.
     struct Product {
         address token;
         uint256 value;
-        uint256 interestRate;
-        uint256 overdueRate;
+        uint256 interestPerSecond; // FIXME:
+        uint256 overdueInterestPerSecond;
         string uri;
         uint256 tokenBalance;
         uint64 startTs;
@@ -60,8 +60,8 @@ contract CouponBond is
         uint256 _initialSupply,
         address _token,
         uint256 _value,
-        uint256 _interestRate,
-        uint256 _overdueRate,
+        uint256 _interestPerSecond,
+        uint256 _overdueInterestPerSecond,
         string memory _uri,
         uint64 _startTs,
         uint64 _endTs
@@ -69,8 +69,8 @@ contract CouponBond is
         Product memory newProduct = Product({
             token: _token,
             value: _value,
-            interestRate: _interestRate,
-            overdueRate: _overdueRate,
+            interestPerSecond: _interestPerSecond,
+            overdueInterestPerSecond: _overdueInterestPerSecond,
             uri: _uri,
             tokenBalance: 0,
             startTs: _startTs,
@@ -126,6 +126,7 @@ contract CouponBond is
         );
     }
 
+    /// @notice The debt does not increase after repaid.
     function getUnitDebt(uint256 _id) public view returns (uint256) {
         Product storage product = products[_id];
         uint256 ts = 0;
@@ -138,11 +139,11 @@ contract CouponBond is
             ts = block.timestamp;
         }
 
-        uint256 interest = product.interestRate * (ts - product.startTs);
+        uint256 interest = product.interestPerSecond * (ts - product.startTs);
 
         // Overdue
         if (product.endTs < ts) {
-            interest += product.overdueRate * (ts - product.endTs);
+            interest += product.overdueInterestPerSecond * (ts - product.endTs);
         }
 
         return (product.value + interest);
@@ -213,8 +214,8 @@ contract CouponBond is
         return
             unclaimedInterest[_id][_to] +
             _calculateInterest(
-                product.interestRate,
-                product.overdueRate,
+                product.interestPerSecond,
+                product.overdueInterestPerSecond,
                 userLastUpdatedTs,
                 product.endTs,
                 block.timestamp
@@ -258,8 +259,8 @@ contract CouponBond is
         unclaimedInterest[_id][_to] +=
             balanceOf(_to, _id) *
             _calculateInterest(
-                product.interestRate,
-                product.overdueRate,
+                product.interestPerSecond,
+                product.overdueInterestPerSecond,
                 userLastUpdatedTs,
                 product.endTs,
                 block.timestamp
@@ -268,17 +269,17 @@ contract CouponBond is
     }
 
     function _calculateInterest(
-        uint256 _rateInSecond,
-        uint256 _overdueRateInSecond,
+        uint256 _interestPerSecond,
+        uint256 _overdueInterestPerSecond,
         uint256 _lastUpdatedTs,
         uint256 _endTs,
         uint256 _currentTs
     ) internal pure returns (uint256) {
         uint256 timeDelta = _currentTs - _lastUpdatedTs;
-        uint256 interest = _rateInSecond * timeDelta;
+        uint256 interest = _interestPerSecond * timeDelta;
         if (_endTs < _currentTs) {
             uint256 latest = _endTs > _lastUpdatedTs ? _endTs : _lastUpdatedTs;
-            interest += _overdueRateInSecond * (_currentTs - latest);
+            interest += _overdueInterestPerSecond * (_currentTs - latest);
         }
 
         return interest;
