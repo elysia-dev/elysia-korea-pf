@@ -8,6 +8,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+// import "../lib/forge-std/src/console2.sol";
+
 /// @notice This repays the interest monthly. At the maturity date, lenders receive the principal and one-month interest.
 contract CouponBond is
     ERC1155Supply,
@@ -26,13 +28,13 @@ contract CouponBond is
     error AlreadyRepaid(uint256 _id);
 
     /// @param value                    value per token in WAD, e.g. $100
-    /// @param interestPerSecond            interest rate per token in second. WAD. e.g. 15%
+    /// @param interestPerSecond        interest rate per token in second. WAD. e.g. 15%
     /// @param overdueInterestPerSecond additional interest rate per token when overdue. WAD. e.g. 3% -> total 18% when overdue
     /// @param repaidBalance            total amount of token repaid. decimal is the same with `token`.
     struct Product {
         address token;
         uint256 value;
-        uint256 interestPerSecond; // FIXME:
+        uint256 interestPerSecond;
         uint256 overdueInterestPerSecond;
         string uri;
         uint256 tokenBalance;
@@ -120,7 +122,7 @@ contract CouponBond is
         }
 
         IERC20(product.token).safeTransferFrom(
-            msg.sender,
+            _msgSender(),
             address(this),
             repayingAmount
         );
@@ -163,7 +165,7 @@ contract CouponBond is
 
         _updateInterest(_to, _id);
 
-        if (product.endTs <= block.timestamp && isRepaid(_id)) {
+        if (isRepaid(_id)) {
             uint256 balance = balanceOf(_to, _id);
 
             // Both interest & principal
@@ -171,7 +173,7 @@ contract CouponBond is
                 (product.value * balance) +
                 unclaimedInterest[_id][_to];
 
-            _burn(_to, _id, 1);
+            _burn(_to, _id, balance);
         } else {
             // only interest
             receiveAmount = unclaimedInterest[_id][_to];
@@ -207,20 +209,10 @@ contract CouponBond is
         view
         returns (uint256)
     {
-        Product storage product = products[_id];
-        if (product.startTs < 0) return 0;
-        uint256 userLastUpdatedTs = lastUpdatedTs[_id][_to];
-
-        return
-            unclaimedInterest[_id][_to] +
-            _calculateInterest(
-                product.interestPerSecond,
-                product.overdueInterestPerSecond,
-                userLastUpdatedTs,
-                product.endTs,
-                block.timestamp
-            );
+        return unclaimedInterest[_id][_to] + _getAdditionalInterest(_to, _id);
     }
+
+    // ****** internal ****** //
 
     function _beforeTokenTransfer(
         address operator,
@@ -247,24 +239,39 @@ contract CouponBond is
         }
     }
 
-    function _updateInterest(address _to, uint256 _id) internal {
+    function _getAdditionalInterest(address _to, uint256 _id)
+        internal
+        view
+        returns (uint256)
+    {
         Product storage product = products[_id];
-        if (block.timestamp <= product.startTs) return;
+        if (block.timestamp <= product.startTs) return 0;
 
         uint256 userLastUpdatedTs = lastUpdatedTs[_id][_to];
-        if (userLastUpdatedTs == 0) {
+        uint256 currentTs = block.timestamp;
+
+        if (userLastUpdatedTs < product.startTs) {
             userLastUpdatedTs = product.startTs;
         }
 
-        unclaimedInterest[_id][_to] +=
+        if (isRepaid(_id)) {
+            currentTs = product.repaidTs;
+        }
+
+        return
             balanceOf(_to, _id) *
             _calculateInterest(
                 product.interestPerSecond,
                 product.overdueInterestPerSecond,
                 userLastUpdatedTs,
                 product.endTs,
-                block.timestamp
+                currentTs
             );
+    }
+
+    /// @notice Save the current unclaimed interest and the updated timestamp.
+    function _updateInterest(address _to, uint256 _id) internal {
+        unclaimedInterest[_id][_to] = getInterest(_to, _id);
         lastUpdatedTs[_id][_to] = block.timestamp;
     }
 

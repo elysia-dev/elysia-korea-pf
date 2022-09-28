@@ -12,8 +12,10 @@ contract CouponBondTest is Test {
     uint64 endTs = 1694012400; // 2022-09-07 GMT+0900
     uint256 constant id = 0;
     uint256 principalPerToken = 100 * 1e18;
-    uint256 interestRate = (principalPerToken * 30) / (100 * (endTs - startTs));
-    uint256 overdueRate = (principalPerToken * 3) / (100 * 365 days);
+    uint256 interestPerSecond =
+        (principalPerToken * 30) / (100 * (endTs - startTs));
+    uint256 overdueInterestPerSecond =
+        (principalPerToken * 3) / (100 * 365 days);
     uint256 totalSupply = 1000;
 
     address owner = address(0x1);
@@ -22,18 +24,22 @@ contract CouponBondTest is Test {
 
     mapping(address => uint256) balances;
     mapping(address => uint256) interests;
-    uint256 bobBalance = 100;
 
     function _everybodyClaims() internal {
         // Everybody claims
         changePrank(alice);
+        // console2.log("alice bond balance: ", couponBond.balanceOf(alice, id));
         couponBond.claim(alice, id);
+        // console2.log("balance: ", usdt.balanceOf(address(couponBond)));
+
+        changePrank(bob);
+        // console2.log("bob bond balance: ", couponBond.balanceOf(bob, id));
+        couponBond.claim(bob, id);
+        // console2.log("balance: ", usdt.balanceOf(address(couponBond)));
 
         changePrank(owner);
         couponBond.claim(owner, id);
-
-        changePrank(bob);
-        couponBond.claim(bob, id);
+        // console2.log("balance: ", usdt.balanceOf(address(couponBond)));
 
         changePrank(owner);
     }
@@ -41,6 +47,7 @@ contract CouponBondTest is Test {
     function setUp() public {
         balances[alice] = 1;
         balances[bob] = 100;
+        balances[owner] = totalSupply - balances[alice] - balances[bob];
 
         vm.startPrank(owner);
         usdt = new MockERC20();
@@ -50,8 +57,8 @@ contract CouponBondTest is Test {
             totalSupply,
             address(usdt),
             principalPerToken, // bsc USDT or BUSD both use decimal 18, each token are worth $100.
-            interestRate,
-            overdueRate,
+            interestPerSecond,
+            overdueInterestPerSecond,
             "ipfs://testuri",
             startTs,
             endTs
@@ -64,20 +71,20 @@ contract CouponBondTest is Test {
     }
 
     // N seconds elapsed but it's still before endTs -> claim
-    function testClaimBeforeRepay(uint64 elapsed) public {
+    function testClaimBeforeRepayAll(uint64 elapsed) public {
         vm.assume(elapsed <= endTs - startTs);
         vm.warp(startTs + elapsed);
 
         usdt.approve(address(couponBond), type(uint256).max);
-        couponBond.repay(id, type(uint256).max);
+        couponBond.repay(id, 30000 * 1e18); // repay only some interest
 
         couponBond.claim(alice, id);
 
-        assertEq(usdt.balanceOf(alice), interestRate * elapsed); // interest transferred
+        assertEq(usdt.balanceOf(alice), interestPerSecond * elapsed); // interest transferred
         assertEq(couponBond.balanceOf(alice, id), balances[alice]); // Not burned
 
         couponBond.claim(alice, id);
-        assertEq(usdt.balanceOf(alice), interestRate * elapsed); // No duplicate interest
+        assertEq(usdt.balanceOf(alice), interestPerSecond * elapsed); // No duplicate interest
     }
 
     // The time elapses after endTs -> claim -> repay all -> claim
@@ -92,9 +99,11 @@ contract CouponBondTest is Test {
 
         uint256 overdueInterest = 0;
         if (endTs < block.timestamp) {
-            overdueInterest = overdueRate * (block.timestamp - endTs);
+            overdueInterest =
+                overdueInterestPerSecond *
+                (block.timestamp - endTs);
         }
-        uint256 totalInterest = interestRate *
+        uint256 totalInterest = interestPerSecond *
             (block.timestamp - startTs) +
             overdueInterest;
 
@@ -163,9 +172,14 @@ contract CouponBondTest is Test {
         assertEq(usdt.balanceOf(address(couponBond)), tokenBalance);
     }
 
-    /*
+    // Given 0 < lastUpdatedTs < startTs
+    function testGetInterest1(uint64 currentTs) public {
+        vm.assume(currentTs < startTs); // no invalid timestamp
+        vm.warp(currentTs);
+    }
+
     function testRepayAllBeforeEndTs() public {
-        vm.warp(endTs - 100);
+        vm.warp(endTs - 3);
         uint256 totalDebt = principalPerToken * totalSupply;
         uint256 duration = endTs - startTs - 3;
 
@@ -174,30 +188,23 @@ contract CouponBondTest is Test {
         deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
 
         _everybodyClaims();
-        // Check if it is the same with the below.
-        // usdt.transfer(address(couponBond), 130 * 1000 * 1e18); // 30% interest i.e. $100 -> $130
-        assertEq(usdt.balanceOf(alice), interests[alice]);
-        assertEq(usdt.balanceOf(bob), interests[bob]);
-        assertEq(usdt.balanceOf(owner), interests[owner]);
+        interests[alice] = interestPerSecond * duration * balances[alice];
+        interests[bob] = interestPerSecond * duration * balances[bob];
+        interests[owner] = interestPerSecond * duration * balances[owner];
 
-        vm.warp(endTs);
-        _everybodyClaims();
         assertEq(
             usdt.balanceOf(alice),
             interests[alice] + balances[alice] * principalPerToken
         );
         assertEq(
             usdt.balanceOf(bob),
-            interests[alice] + balances[bob] * principalPerToken
+            interests[bob] + balances[bob] * principalPerToken
         );
         assertEq(
             usdt.balanceOf(owner),
-            interests[owner] * balances[owner] * principalPerToken
+            interests[owner] + balances[owner] * principalPerToken
         );
-
-        (duration / (endTs - startTs)) * 30 * 1000;
     }
-    */
 
     function testOverdueRepay() public {
         // TODO: everybody claims
