@@ -70,6 +70,8 @@ contract CouponBondTest is Test {
         couponBond.safeTransferFrom(owner, bob, id, balances[bob], "");
     }
 
+    // ********** Claim ********** //
+
     // N seconds elapsed but it's still before endTs -> claim
     function testClaimBeforeRepayAll(uint64 elapsed) public {
         vm.assume(elapsed <= endTs - startTs);
@@ -117,6 +119,87 @@ contract CouponBondTest is Test {
         assertEq(usdt.balanceOf(alice), principalPerToken + totalInterest);
     }
 
+    function testBurnTokenWhenClaimAfterRepay() public {
+        vm.warp(endTs + 100);
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, type(uint256).max);
+
+        couponBond.claim(alice, id);
+
+        assertEq(couponBond.balanceOf(alice, id), 0);
+        assertEq(couponBond.totalSupply(id), totalSupply - balances[alice]);
+    }
+
+    function testRepayAllBeforeEndTs(uint32 elapsed) public {
+        uint64 currentTs = startTs + elapsed;
+        vm.assume(currentTs < endTs);
+        vm.warp(currentTs);
+        uint256 totalDebt = principalPerToken * totalSupply;
+        uint256 duration = currentTs - startTs;
+
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, type(uint256).max);
+        deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
+
+        _everybodyClaims();
+        interests[alice] = interestPerSecond * duration * balances[alice];
+        interests[bob] = interestPerSecond * duration * balances[bob];
+        interests[owner] = interestPerSecond * duration * balances[owner];
+
+        assertEq(
+            usdt.balanceOf(alice),
+            interests[alice] + balances[alice] * principalPerToken
+        );
+        assertEq(
+            usdt.balanceOf(bob),
+            interests[bob] + balances[bob] * principalPerToken
+        );
+        assertEq(
+            usdt.balanceOf(owner),
+            interests[owner] + balances[owner] * principalPerToken
+        );
+        assertEq(usdt.balanceOf(address(couponBond)), 0);
+    }
+
+    // Check the interest is added when overdue
+    function testOverdueRepay(uint64 overdue) public {
+        vm.assume(overdue < type(uint64).max - endTs);
+        vm.warp(endTs + overdue);
+        uint64 currentTs = endTs + overdue;
+        uint256 duration = endTs - currentTs;
+        uint256 totalDebt = principalPerToken * totalSupply;
+
+        /*
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, ?);
+        assertTrue(couponBond.isRepaid(id))
+
+        deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
+
+        _everybodyClaims();
+        interests[alice] = interestPerSecond * duration * balances[alice];
+        interests[bob] = interestPerSecond * duration * balances[bob];
+        interests[owner] = interestPerSecond * duration * balances[owner];
+
+        assertEq(
+            usdt.balanceOf(alice),
+            interests[alice] + balances[alice] * principalPerToken
+        );
+        assertEq(
+            usdt.balanceOf(bob),
+            interests[bob] + balances[bob] * principalPerToken
+        );
+        assertEq(
+            usdt.balanceOf(owner),
+            interests[owner] + balances[owner] * principalPerToken
+        );
+
+        _everybodyClaims();
+        */
+    }
+
+    // ********** Repay ********** //
+
     // Scenario: repay all -> claim -> repay all
     function testRepayTwice(uint64 elapsed) public {
         vm.assume(elapsed <= 36500 days); // no invalid timestamp
@@ -132,17 +215,6 @@ contract CouponBondTest is Test {
         // 3. repay all
         vm.expectRevert(abi.encodeWithSignature("AlreadyRepaid(uint256)", id));
         couponBond.repay(id, type(uint256).max);
-    }
-
-    function testBurnTokenWhenClaimAfterRepay() public {
-        vm.warp(endTs + 100);
-        usdt.approve(address(couponBond), type(uint256).max);
-        couponBond.repay(id, type(uint256).max);
-
-        couponBond.claim(alice, id);
-
-        assertEq(couponBond.balanceOf(alice, id), 0);
-        assertEq(couponBond.totalSupply(id), totalSupply - balances[alice]);
     }
 
     function testRepayAllBeforeStart() public {
@@ -172,52 +244,66 @@ contract CouponBondTest is Test {
         assertEq(usdt.balanceOf(address(couponBond)), tokenBalance);
     }
 
-    // Given 0 < lastUpdatedTs < startTs
-    function testGetInterest1(uint64 currentTs) public {
-        vm.assume(currentTs < startTs); // no invalid timestamp
+    // ********** getInterest ********** //
+
+    // Given 0 < lastUpdatedTs <= startTs
+    function testGetInterestBeforeStart(uint64 currentTs) public {
+        vm.warp(2); // timestamp 1 is used in setUp
+        changePrank(alice);
+        couponBond.safeTransferFrom(alice, alice, id, 1, ""); // Update lastUpdatedTs
+        assertEq(couponBond.lastUpdatedTs(id, alice), 2);
+        changePrank(owner);
+
+        vm.assume(2 <= currentTs && currentTs <= startTs); // no invalid timestamp
         vm.warp(currentTs);
+        assertEq(couponBond.getInterest(alice, id), 0);
     }
 
-    function testRepayAllBeforeEndTs() public {
-        vm.warp(endTs - 3);
-        uint256 totalDebt = principalPerToken * totalSupply;
-        uint256 duration = endTs - startTs - 3;
-
-        usdt.approve(address(couponBond), type(uint256).max);
-        couponBond.repay(id, type(uint256).max);
-        deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
-
-        _everybodyClaims();
-        interests[alice] = interestPerSecond * duration * balances[alice];
-        interests[bob] = interestPerSecond * duration * balances[bob];
-        interests[owner] = interestPerSecond * duration * balances[owner];
-
-        assertEq(
-            usdt.balanceOf(alice),
-            interests[alice] + balances[alice] * principalPerToken
-        );
-        assertEq(
-            usdt.balanceOf(bob),
-            interests[bob] + balances[bob] * principalPerToken
-        );
-        assertEq(
-            usdt.balanceOf(owner),
-            interests[owner] + balances[owner] * principalPerToken
-        );
+    function testGetInterestAfterStart(uint32 elapsed) public {
+        vm.assume(startTs + elapsed < endTs);
+        vm.warp(startTs + elapsed);
+        uint256 interest = interestPerSecond * elapsed;
+        assertEq(couponBond.getInterest(alice, id), interest);
     }
 
-    function testOverdueRepay() public {
-        // TODO: everybody claims
-        // TODO: Check the interest is added when overdue
-
-        _everybodyClaims();
+    // Overdue
+    function testGetInterestAfterEnd(uint64 overdue) public {
+        vm.assume(overdue < type(uint64).max - endTs);
+        vm.warp(endTs + overdue);
+        uint64 elapsed = endTs + overdue - startTs;
+        uint256 interest = interestPerSecond *
+            elapsed +
+            overdueInterestPerSecond *
+            overdue;
+        assertEq(couponBond.getInterest(alice, id), interest);
     }
 
+    // Should return only unclaimed interest
+    function testGetInterestAfterClaimOnce(uint64 currentTs) public {}
+
+    // ********** getUnitDebt ********** //
     // TODO: Test getUnitDebt: 3가지 케이스
-    function testGetUnitDebt() public {}
+    function testGetUnitDebt() public {
+        // getUnitDebt(id);
+    }
 
+    // ********** getUnpaidDebt ********** //
     // TODO: Test getUnpaidDebt
-    function testGetUnpaidDebt() public {}
+    function testGetUnpaidDebt() public {
+        // TODO: Check the result does not increase after claim
+        uint256 elapsed = 7;
+        vm.warp(startTs + 7);
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, 30000 * 1e18); // repay only some interest
+
+        uint256 debtBefore = couponBond.getUnpaidDebt(id);
+        console.log("debtBefore: ", debtBefore);
+
+        couponBond.claim(alice, id);
+
+        uint256 debtAfter = couponBond.getUnpaidDebt(id);
+        console.log("debtAfter: ", debtAfter);
+    }
 
     /*
     function testWithdrawResidue() public {

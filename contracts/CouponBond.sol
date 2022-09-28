@@ -30,14 +30,14 @@ contract CouponBond is
     /// @param value                    value per token in WAD, e.g. $100
     /// @param interestPerSecond        interest rate per token in second. WAD. e.g. 15%
     /// @param overdueInterestPerSecond additional interest rate per token when overdue. WAD. e.g. 3% -> total 18% when overdue
-    /// @param repaidBalance            total amount of token repaid. decimal is the same with `token`.
+    /// @param totalRepaid              total amount of token repaid. decimal is the same with `token`.
     struct Product {
         address token;
         uint256 value;
         uint256 interestPerSecond;
         uint256 overdueInterestPerSecond;
         string uri;
-        uint256 tokenBalance;
+        uint256 totalRepaid;
         uint64 startTs;
         uint64 endTs;
         uint64 repaidTs;
@@ -74,7 +74,7 @@ contract CouponBond is
             interestPerSecond: _interestPerSecond,
             overdueInterestPerSecond: _overdueInterestPerSecond,
             uri: _uri,
-            tokenBalance: 0,
+            totalRepaid: 0,
             startTs: _startTs,
             endTs: _endTs,
             repaidTs: 0
@@ -116,8 +116,9 @@ contract CouponBond is
             repayingAmount = unpaidDebt;
         }
 
-        product.tokenBalance += repayingAmount;
-        if (unpaidDebt <= product.tokenBalance) {
+        product.totalRepaid += repayingAmount;
+
+        if (getTotalDebt(_id) <= product.totalRepaid) {
             product.repaidTs = uint64(block.timestamp);
         }
 
@@ -126,6 +127,11 @@ contract CouponBond is
             address(this),
             repayingAmount
         );
+    }
+
+    /// @dev ERC-1155 totalSupply has no decimal. Therefore, just multiply totalSupply * debt per token
+    function getTotalDebt(uint256 _id) public view returns (uint256) {
+        return totalSupply(_id) * getUnitDebt(_id);
     }
 
     /// @notice The debt does not increase after repaid.
@@ -153,8 +159,7 @@ contract CouponBond is
 
     function getUnpaidDebt(uint256 _id) public view returns (uint256) {
         Product storage product = products[_id];
-        // NOTE: ERC-1155 totalSupply has no decimal.
-        return totalSupply(_id) * getUnitDebt(_id) - product.tokenBalance;
+        return getTotalDebt(_id) - product.totalRepaid;
     }
 
     /// @notice Nft holders claim their interest.
@@ -182,7 +187,6 @@ contract CouponBond is
         unclaimedInterest[_id][_to] = 0;
         lastUpdatedTs[_id][_to] = block.timestamp;
 
-        product.tokenBalance -= receiveAmount;
         IERC20(product.token).safeTransfer(_to, receiveAmount);
     }
 
