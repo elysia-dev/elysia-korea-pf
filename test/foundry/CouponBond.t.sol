@@ -163,24 +163,27 @@ contract CouponBondTest is Test {
 
     // Check the interest is added when overdue
     function testOverdueRepay(uint64 overdue) public {
-        // TODO:
-        vm.assume(overdue < type(uint64).max - endTs);
+        vm.assume(overdue < 36500 days);
         vm.warp(endTs + overdue);
         uint64 currentTs = endTs + overdue;
-        uint256 duration = endTs - currentTs;
+        uint256 duration = currentTs - startTs;
         uint256 totalDebt = principalPerToken * totalSupply;
 
-        /*
         usdt.approve(address(couponBond), type(uint256).max);
-        couponBond.repay(id, ?);
-        assertTrue(couponBond.isRepaid(id))
+        couponBond.repay(id, type(uint256).max);
+        assertTrue(couponBond.isRepaid(id));
 
         deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
 
         _everybodyClaims();
-        interests[alice] = interestPerSecond * duration * balances[alice];
-        interests[bob] = interestPerSecond * duration * balances[bob];
-        interests[owner] = interestPerSecond * duration * balances[owner];
+        uint256 interestPerToken = interestPerSecond *
+            (endTs - startTs) +
+            (interestPerSecond + overdueInterestPerSecond) *
+            overdue;
+
+        interests[alice] = interestPerToken * balances[alice];
+        interests[bob] = interestPerToken * balances[bob];
+        interests[owner] = interestPerToken * balances[owner];
 
         assertEq(
             usdt.balanceOf(alice),
@@ -196,7 +199,6 @@ contract CouponBondTest is Test {
         );
 
         _everybodyClaims();
-        */
     }
 
     // ********** Repay ********** //
@@ -347,8 +349,13 @@ contract CouponBondTest is Test {
         // TODO:
     }
 
-    // unpaidDebt should decrease after repay all
+    // unpaidDebt should increase as time passes
     function testGetUnpaidDebt3() public {
+        // TODO:
+    }
+
+    // unpaidDebt should remain 0 forever after repaid.
+    function testGetUnpaidDebt4() public {
         // TODO:
     }
 }
