@@ -163,6 +163,7 @@ contract CouponBondTest is Test {
 
     // Check the interest is added when overdue
     function testOverdueRepay(uint64 overdue) public {
+        // TODO:
         vm.assume(overdue < type(uint64).max - endTs);
         vm.warp(endTs + overdue);
         uint64 currentTs = endTs + overdue;
@@ -279,58 +280,75 @@ contract CouponBondTest is Test {
     }
 
     // Should return only unclaimed interest
-    function testGetInterestAfterClaimOnce(uint64 currentTs) public {}
+    function testGetInterestAfterClaimOnce(uint64 currentTs) public {
+        // TODO:
+    }
 
     // ********** getUnitDebt ********** //
-    // TODO: Test getUnitDebt: 3가지 케이스
-    function testGetUnitDebt() public {
-        // getUnitDebt(id);
+    // Test 4 cases
+    function testGetUnitDebtBeforeStartTs() public {
+        assertEq(couponBond.getUnitDebt(id), principalPerToken);
+    }
+
+    function testGetUnitDebtAfterStartTs(uint32 elapsed) public {
+        vm.assume(elapsed <= endTs - startTs);
+        vm.warp(startTs + elapsed);
+        uint256 interest = interestPerSecond * elapsed;
+        assertEq(couponBond.getUnitDebt(id), principalPerToken + interest);
+    }
+
+    function testGetUnitDebtAfterEndTs(uint32 overdue) public {
+        vm.warp(endTs + overdue);
+        uint256 interest = interestPerSecond * (endTs - startTs);
+        uint256 overdueInterest = (overdueInterestPerSecond +
+            interestPerSecond) * overdue;
+        assertEq(
+            couponBond.getUnitDebt(id),
+            principalPerToken + interest + overdueInterest
+        );
+    }
+
+    // getUnitDebt does not change after repaid.
+    function testGetUnitDebtAfterRepaid(uint32 elapsed) public {
+        vm.assume(elapsed <= endTs - startTs);
+        vm.warp(startTs + elapsed);
+        uint256 interest = interestPerSecond * elapsed;
+        uint256 totalUnpaidDebt = couponBond.getUnpaidDebt(id);
+        assertEq(
+            totalUnpaidDebt,
+            couponBond.totalSupply(id) * (interest + principalPerToken)
+        );
+
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, totalUnpaidDebt);
+
+        assertTrue(couponBond.isRepaid(id));
+        skip(300);
+        assertEq(couponBond.getUnitDebt(id), interest + principalPerToken);
     }
 
     // ********** getUnpaidDebt ********** //
-    // TODO: Test getUnpaidDebt
-    function testGetUnpaidDebt() public {
-        // TODO: Check the result does not increase after claim
+    // unpaidDebt should not increase after claim
+    function testGetUnpaidDebt1() public {
         uint256 elapsed = 7;
         vm.warp(startTs + 7);
         usdt.approve(address(couponBond), type(uint256).max);
         couponBond.repay(id, 30000 * 1e18); // repay only some interest
 
         uint256 debtBefore = couponBond.getUnpaidDebt(id);
-        console.log("debtBefore: ", debtBefore);
-
         couponBond.claim(alice, id);
 
         uint256 debtAfter = couponBond.getUnpaidDebt(id);
-        console.log("debtAfter: ", debtAfter);
+        assertEq(debtBefore, debtAfter);
     }
 
-    /*
-    function testWithdrawResidue() public {
-        uint256 withdrawAmount = 1e18; // arbitrary amount less than the balance of the coupondBond contract
-        uint256 beforeBalance = couponBond.balanceOf(alice, id);
-
-        // revert if not repaid
-        vm.expectRevert(abi.encodeWithSignature("NotRepaid(uint256)", id));
-        couponBond.withdrawResidue(id, withdrawAmount);
-
-        // revert if too early
-        usdt.approve(address(couponBond), type(uint256).max);
-        couponBond.repay(id, type(uint256).max);
-        vm.expectRevert(abi.encodeWithSignature("EarlyWithdraw()"));
-        couponBond.withdrawResidue(id, withdrawAmount);
-
-        // Action
-        vm.warp(endTs + 8 weeks);
-        uint256 usdtBeforeBalance = usdt.balanceOf(owner);
-        couponBond.withdrawResidue(id, withdrawAmount);
-
-        // Do Not burn user's unclaimed tokens
-        uint256 afterBalance = couponBond.balanceOf(alice, id);
-        assertEq(beforeBalance, afterBalance);
-
-        // Check if usdt withdrawed.
-        assertEq(usdt.balanceOf(owner), withdrawAmount + usdtBeforeBalance);
+    // unpaidDebt should decrease after repay
+    function testGetUnpaidDebt2() public {
+        // TODO:
     }
-    */
+
+    // unpaidDebt should decrease after repay all
+    function testGetUnpaidDebt3() public {
+        // TODO:
+    }
 }

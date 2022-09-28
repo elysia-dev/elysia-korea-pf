@@ -129,6 +129,34 @@ contract CouponBond is
         );
     }
 
+    /// @notice Nft holders claim their interest.
+    /// NOTE: Users with zero balance are also able to claim.
+    function claim(address _to, uint256 _id) external whenNotPaused {
+        Product storage product = products[_id];
+        uint256 receiveAmount;
+
+        _updateInterest(_to, _id);
+
+        if (isRepaid(_id)) {
+            uint256 balance = balanceOf(_to, _id);
+
+            // Both interest & principal
+            receiveAmount =
+                (product.value * balance) +
+                unclaimedInterest[_id][_to];
+
+            _burn(_to, _id, balance);
+        } else {
+            // only interest
+            receiveAmount = unclaimedInterest[_id][_to];
+        }
+
+        unclaimedInterest[_id][_to] = 0;
+        lastUpdatedTs[_id][_to] = block.timestamp;
+
+        IERC20(product.token).safeTransfer(_to, receiveAmount);
+    }
+
     /// @dev ERC-1155 totalSupply has no decimal. Therefore, just multiply totalSupply * debt per token
     function getTotalDebt(uint256 _id) public view returns (uint256) {
         return totalSupply(_id) * getUnitDebt(_id);
@@ -161,52 +189,6 @@ contract CouponBond is
         Product storage product = products[_id];
         return getTotalDebt(_id) - product.totalRepaid;
     }
-
-    /// @notice Nft holders claim their interest.
-    /// NOTE: Users with zero balance are also able to claim.
-    function claim(address _to, uint256 _id) external whenNotPaused {
-        Product storage product = products[_id];
-        uint256 receiveAmount;
-
-        _updateInterest(_to, _id);
-
-        if (isRepaid(_id)) {
-            uint256 balance = balanceOf(_to, _id);
-
-            // Both interest & principal
-            receiveAmount =
-                (product.value * balance) +
-                unclaimedInterest[_id][_to];
-
-            _burn(_to, _id, balance);
-        } else {
-            // only interest
-            receiveAmount = unclaimedInterest[_id][_to];
-        }
-
-        unclaimedInterest[_id][_to] = 0;
-        lastUpdatedTs[_id][_to] = block.timestamp;
-
-        IERC20(product.token).safeTransfer(_to, receiveAmount);
-    }
-
-    /*
-    /// @notice Admin withdraws the money to repay later when users do not claim for a long time.
-    /// @param _id token id
-    /// @param _amount the amount of token to withdraw
-    /// NOTE: Do not _burn to allow users claim later.
-    function withdrawResidue(uint256 _id, uint256 _amount) external onlyOwner {
-        Product storage product = products[_id];
-        if (!isRepaid(_id)) revert NotRepaid(_id);
-        if (block.timestamp < product.endTs + 8 weeks) revert EarlyWithdraw();
-
-        uint256 balance = totalSupply(_id);
-        if (balance == 0) revert ZeroBalanceWithdraw(_id);
-
-        product.tokenBalance -= _amount;
-        IERC20(product.token).safeTransfer(owner(), _amount);
-    }
-    */
 
     function getInterest(address _to, uint256 _id)
         public
