@@ -29,21 +29,6 @@ contract CouponBond is
     error NotRepaid(uint256 _id);
     error AlreadyRepaid(uint256 _id);
 
-    /// @param value                    value per token in WAD, e.g. $100
-    /// @param interestPerSecond        interest rate per token in second. WAD. e.g. 15%
-    /// @param overdueInterestPerSecond additional interest rate per token when overdue. WAD. e.g. 3% -> total 18% when overdue
-    /// @param totalRepaid              total amount of token repaid. decimal is the same with `token`.
-    struct Product {
-        address token;
-        uint256 value;
-        uint256 interestPerSecond;
-        uint256 overdueInterestPerSecond;
-        string uri;
-        uint256 totalRepaid;
-        uint64 startTs;
-        uint64 endTs;
-        uint64 repaidTs;
-    }
     mapping(uint256 => Product) public products;
     uint256 public numProducts;
 
@@ -99,14 +84,7 @@ contract CouponBond is
         return products[_id].repaidTs != 0;
     }
 
-    /// @dev It is not able to repay after fully repaying the loan.
-    /// The caller need to approve the repaying token.
-    /// There are 3 cases.
-    /// 1. block.timestamp < startTimestamp: repay only the principal.
-    /// 2. startTs <= block.timestamp <= endTs: repay principal + interest
-    /// 3. endTs < block.timestamp: repay principal + interest + overdue interest
-    /// @param _id token id
-    /// @param _amount amount of token to repay. type(uint256).max means to repay all.
+    /// @inheritdoc ICouponBond
     function repay(uint256 _id, uint256 _amount) external override {
         Product storage product = products[_id];
         uint256 repayingAmount = _amount;
@@ -131,8 +109,7 @@ contract CouponBond is
         );
     }
 
-    /// @notice Nft holders claim their interest.
-    /// NOTE: Users with zero balance are also able to claim.
+    /// @inheritdoc ICouponBond
     function claim(address _to, uint256 _id) external override whenNotPaused {
         Product storage product = products[_id];
         uint256 receiveAmount;
