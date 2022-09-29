@@ -45,23 +45,18 @@ interface ICouponBond {
     function repay(uint256 _id, uint256 _amount) external;
 
     /// @notice Nft holders claim their interest.
-    /// Users with zero balance are also able to claim because they once had it,
-    /// but may have transferred.
+    /// Users with zero balance are also able to claim because they might have once had it, but transferred.
     function claim(address _to, uint256 _id) external;
 
     // ********** view ********** //
     /// @notice Show whether the loan is repaid.
     function isRepaid(uint256 _id) external view returns (bool);
 
-    /// @return whether the loan is repaid, unit debt, unclaimed interest
-    function getDebtInfo(uint256 _id, address _lender)
+    /// @notice Calculate how many tokens to receive on claim.
+    function previewClaim(address _lender, uint256 _id)
         external
         view
-        returns (
-            bool,
-            uint256,
-            uint256
-        );
+        returns (uint256);
 
     /// @notice Calculate the total debt regardless of the repaid amount.
     function getTotalDebt(uint256 _id) external view returns (uint256);

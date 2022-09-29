@@ -254,7 +254,7 @@ contract CouponBondTest is Test {
         vm.warp(2); // timestamp 1 is used in setUp
         changePrank(alice);
         couponBond.safeTransferFrom(alice, alice, id, 1, ""); // Update lastUpdatedTs
-        assertEq(couponBond.lastUpdatedTs(id, alice), 2);
+        assertEq(couponBond.lastUpdatedTs(id, alice), 0);
         changePrank(owner);
 
         vm.assume(2 <= currentTs && currentTs <= startTs); // no invalid timestamp

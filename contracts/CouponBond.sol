@@ -72,16 +72,8 @@ contract CouponBond is
         numProducts++;
     }
 
-    function uri(uint256 _id) public view override returns (string memory) {
-        return products[_id].uri;
-    }
-
     function setURI(uint256 _id, string memory _uri) external onlyOwner {
         products[_id].uri = _uri;
-    }
-
-    function isRepaid(uint256 _id) public view override returns (bool) {
-        return products[_id].repaidTs != 0;
     }
 
     /// @inheritdoc ICouponBond
@@ -131,29 +123,39 @@ contract CouponBond is
         }
 
         unclaimedInterest[_id][_to] = 0;
-        lastUpdatedTs[_id][_to] = block.timestamp;
+        // Already done in _updateInterest
+        // lastUpdatedTs[_id][_to] = block.timestamp;
 
         IERC20(product.token).safeTransfer(_to, receiveAmount);
     }
 
-    /// @dev ERC-1155 totalSupply has no decimal. Therefore, just multiply totalSupply * debt per token
-    function getDebtInfo(uint256 _id, address _lender)
+    // ********** view ********** //
+
+    function uri(uint256 _id) public view override returns (string memory) {
+        return products[_id].uri;
+    }
+
+    function isRepaid(uint256 _id) public view override returns (bool) {
+        return products[_id].repaidTs != 0;
+    }
+
+    function previewClaim(address _lender, uint256 _id)
         external
         view
         override
-        returns (
-            bool,
-            uint256,
-            uint256
-        )
+        returns (uint256)
     {
-        bool repaid = isRepaid(_id);
-        uint256 unitDebt = getUnitDebt(_id);
-        uint256 unclaimed = getUnclaimedInterest(_lender, _id);
-
-        return (repaid, unitDebt, unclaimed);
+        if (isRepaid(_id)) {
+            return
+                balanceOf(_lender, _id) *
+                products[_id].value +
+                getUnclaimedInterest(_lender, _id);
+        } else {
+            return getUnclaimedInterest(_lender, _id);
+        }
     }
 
+    /// @dev ERC-1155 totalSupply has no decimal. Therefore, just multiply totalSupply * debt per token
     function getTotalDebt(uint256 _id) public view override returns (uint256) {
         return totalSupply(_id) * getUnitDebt(_id);
     }
@@ -161,31 +163,24 @@ contract CouponBond is
     /// @inheritdoc ICouponBond
     function getUnitDebt(uint256 _id) public view override returns (uint256) {
         Product storage product = products[_id];
-        uint256 ts = 0;
-
-        if (isRepaid(_id)) {
-            ts = product.repaidTs;
-        } else if (block.timestamp < product.startTs) {
-            ts = product.startTs; // just set interest as 0
-        } else {
-            ts = block.timestamp;
-        }
-
-        uint256 interest = product.interestPerSecond * (ts - product.startTs);
-
-        // Overdue
-        if (product.endTs < ts) {
-            interest += product.overdueInterestPerSecond * (ts - product.endTs);
-        }
-
-        return (product.value + interest);
+        return
+            product.value +
+            _calculateInterest(
+                product.interestPerSecond,
+                product.overdueInterestPerSecond,
+                product.startTs, // calculate from the start
+                product.endTs,
+                product.repaidTs
+            );
     }
 
+    /// @inheritdoc ICouponBond
     function getUnpaidDebt(uint256 _id) public view override returns (uint256) {
         Product storage product = products[_id];
         return getTotalDebt(_id) - product.totalRepaid;
     }
 
+    /// @inheritdoc ICouponBond
     function getUnclaimedInterest(address _to, uint256 _id)
         public
         view
@@ -228,17 +223,11 @@ contract CouponBond is
         returns (uint256)
     {
         Product storage product = products[_id];
-        if (block.timestamp <= product.startTs) return 0;
-
         uint256 userLastUpdatedTs = lastUpdatedTs[_id][_to];
-        uint256 currentTs = block.timestamp;
 
+        // Since a user may have transferred before startTs, userLastUpdatedTs may not be zero and less than product.startTs.
         if (userLastUpdatedTs < product.startTs) {
             userLastUpdatedTs = product.startTs;
-        }
-
-        if (isRepaid(_id)) {
-            currentTs = product.repaidTs;
         }
 
         return
@@ -248,12 +237,15 @@ contract CouponBond is
                 product.overdueInterestPerSecond,
                 userLastUpdatedTs,
                 product.endTs,
-                currentTs
+                product.repaidTs
             );
     }
 
     /// @notice Save the current unclaimed interest and the updated timestamp.
     function _updateInterest(address _to, uint256 _id) internal {
+        if (block.timestamp < products[_id].startTs) return;
+        // if (products[_id].repaidTs <= lastUpdatedTs[_id][_to]) return;
+
         unclaimedInterest[_id][_to] = getUnclaimedInterest(_to, _id);
         lastUpdatedTs[_id][_to] = block.timestamp;
     }
@@ -263,13 +255,16 @@ contract CouponBond is
         uint256 _overdueInterestPerSecond,
         uint256 _lastUpdatedTs,
         uint256 _endTs,
-        uint256 _currentTs
-    ) internal pure returns (uint256) {
-        uint256 timeDelta = _currentTs - _lastUpdatedTs;
+        uint256 _repaidTs
+    ) internal view returns (uint256) {
+        uint256 currentTs = _repaidTs == 0 ? block.timestamp : _repaidTs;
+        if (currentTs <= _lastUpdatedTs) return 0;
+
+        uint256 timeDelta = currentTs - _lastUpdatedTs;
         uint256 interest = _interestPerSecond * timeDelta;
-        if (_endTs < _currentTs) {
+        if (_endTs < currentTs) {
             uint256 latest = _endTs > _lastUpdatedTs ? _endTs : _lastUpdatedTs;
-            interest += _overdueInterestPerSecond * (_currentTs - latest);
+            interest += _overdueInterestPerSecond * (currentTs - latest);
         }
 
         return interest;
