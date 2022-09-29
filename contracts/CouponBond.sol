@@ -7,11 +7,13 @@ import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/ICouponBond.sol";
 
 // import "../lib/forge-std/src/console2.sol";
 
 /// @notice This repays the interest monthly. At the maturity date, lenders receive the principal and one-month interest.
 contract CouponBond is
+    ICouponBond,
     ERC1155Supply,
     ERC1155Burnable,
     ERC1155Pausable,
@@ -93,7 +95,7 @@ contract CouponBond is
         products[_id].uri = _uri;
     }
 
-    function isRepaid(uint256 _id) public view returns (bool) {
+    function isRepaid(uint256 _id) public view override returns (bool) {
         return products[_id].repaidTs != 0;
     }
 
@@ -105,7 +107,7 @@ contract CouponBond is
     /// 3. endTs < block.timestamp: repay principal + interest + overdue interest
     /// @param _id token id
     /// @param _amount amount of token to repay. type(uint256).max means to repay all.
-    function repay(uint256 _id, uint256 _amount) external {
+    function repay(uint256 _id, uint256 _amount) external override {
         Product storage product = products[_id];
         uint256 repayingAmount = _amount;
 
@@ -131,7 +133,7 @@ contract CouponBond is
 
     /// @notice Nft holders claim their interest.
     /// NOTE: Users with zero balance are also able to claim.
-    function claim(address _to, uint256 _id) external whenNotPaused {
+    function claim(address _to, uint256 _id) external override whenNotPaused {
         Product storage product = products[_id];
         uint256 receiveAmount;
 
@@ -158,12 +160,29 @@ contract CouponBond is
     }
 
     /// @dev ERC-1155 totalSupply has no decimal. Therefore, just multiply totalSupply * debt per token
-    function getTotalDebt(uint256 _id) public view returns (uint256) {
+    function getDebtInfo(uint256 _id, address _lender)
+        external
+        view
+        override
+        returns (
+            bool,
+            uint256,
+            uint256
+        )
+    {
+        bool repaid = isRepaid(_id);
+        uint256 unitDebt = getUnitDebt(_id);
+        uint256 unclaimed = getUnclaimedInterest(_lender, _id);
+
+        return (repaid, unitDebt, unclaimed);
+    }
+
+    function getTotalDebt(uint256 _id) public view override returns (uint256) {
         return totalSupply(_id) * getUnitDebt(_id);
     }
 
-    /// @notice The debt does not increase after repaid.
-    function getUnitDebt(uint256 _id) public view returns (uint256) {
+    /// @inheritdoc ICouponBond
+    function getUnitDebt(uint256 _id) public view override returns (uint256) {
         Product storage product = products[_id];
         uint256 ts = 0;
 
@@ -185,14 +204,15 @@ contract CouponBond is
         return (product.value + interest);
     }
 
-    function getUnpaidDebt(uint256 _id) public view returns (uint256) {
+    function getUnpaidDebt(uint256 _id) public view override returns (uint256) {
         Product storage product = products[_id];
         return getTotalDebt(_id) - product.totalRepaid;
     }
 
-    function getInterest(address _to, uint256 _id)
+    function getUnclaimedInterest(address _to, uint256 _id)
         public
         view
+        override
         returns (uint256)
     {
         return unclaimedInterest[_id][_to] + _getAdditionalInterest(_to, _id);
@@ -257,7 +277,7 @@ contract CouponBond is
 
     /// @notice Save the current unclaimed interest and the updated timestamp.
     function _updateInterest(address _to, uint256 _id) internal {
-        unclaimedInterest[_id][_to] = getInterest(_to, _id);
+        unclaimedInterest[_id][_to] = getUnclaimedInterest(_to, _id);
         lastUpdatedTs[_id][_to] = block.timestamp;
     }
 

@@ -247,10 +247,10 @@ contract CouponBondTest is Test {
         assertEq(usdt.balanceOf(address(couponBond)), tokenBalance);
     }
 
-    // ********** getInterest ********** //
+    // ********** getUnclaimedInterest ********** //
 
     // Given 0 < lastUpdatedTs <= startTs
-    function testGetInterestBeforeStart(uint64 currentTs) public {
+    function testGetUnclaimedInterestBeforeStart(uint64 currentTs) public {
         vm.warp(2); // timestamp 1 is used in setUp
         changePrank(alice);
         couponBond.safeTransferFrom(alice, alice, id, 1, ""); // Update lastUpdatedTs
@@ -259,18 +259,18 @@ contract CouponBondTest is Test {
 
         vm.assume(2 <= currentTs && currentTs <= startTs); // no invalid timestamp
         vm.warp(currentTs);
-        assertEq(couponBond.getInterest(alice, id), 0);
+        assertEq(couponBond.getUnclaimedInterest(alice, id), 0);
     }
 
-    function testGetInterestAfterStart(uint32 elapsed) public {
+    function testGetUnclaimedInterestAfterStart(uint32 elapsed) public {
         vm.assume(startTs + elapsed < endTs);
         vm.warp(startTs + elapsed);
         uint256 interest = interestPerSecond * elapsed;
-        assertEq(couponBond.getInterest(alice, id), interest);
+        assertEq(couponBond.getUnclaimedInterest(alice, id), interest);
     }
 
     // Overdue
-    function testGetInterestAfterEnd(uint64 overdue) public {
+    function testGetUnclaimedInterestAfterEnd(uint64 overdue) public {
         vm.assume(overdue < type(uint64).max - endTs);
         vm.warp(endTs + overdue);
         uint64 elapsed = endTs + overdue - startTs;
@@ -278,12 +278,27 @@ contract CouponBondTest is Test {
             elapsed +
             overdueInterestPerSecond *
             overdue;
-        assertEq(couponBond.getInterest(alice, id), interest);
+        assertEq(couponBond.getUnclaimedInterest(alice, id), interest);
     }
 
     // Should return only unclaimed interest
-    function testGetInterestAfterClaimOnce(uint64 currentTs) public {
-        // TODO:
+    function testGetUnclaimedInterestAfterClaimOnce(uint32 elapsed) public {
+        vm.assume(startTs + elapsed < endTs);
+        vm.warp(startTs + elapsed);
+        uint256 interest = interestPerSecond * elapsed;
+        uint256 skipped = 237; // random
+
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, 30000 * 1e18); // repay some interest
+
+        couponBond.claim(alice, id);
+        assertEq(couponBond.getUnclaimedInterest(alice, id), 0);
+
+        skip(skipped);
+        assertEq(
+            couponBond.getUnclaimedInterest(alice, id),
+            interestPerSecond * skipped
+        );
     }
 
     // ********** getUnitDebt ********** //
