@@ -331,9 +331,9 @@ contract CouponBondTest is Test {
 
     // ********** getUnpaidDebt ********** //
     // unpaidDebt should not increase after claim
-    function testGetUnpaidDebt1() public {
-        uint256 elapsed = 7;
-        vm.warp(startTs + 7);
+    function testGetUnpaidDebt1(uint32 elapsed) public {
+        vm.assume(elapsed <= 36500 days);
+        vm.warp(startTs + elapsed);
         usdt.approve(address(couponBond), type(uint256).max);
         couponBond.repay(id, 30000 * 1e18); // repay only some interest
 
@@ -345,17 +345,44 @@ contract CouponBondTest is Test {
     }
 
     // unpaidDebt should decrease after repay
-    function testGetUnpaidDebt2() public {
-        // TODO:
+    function testGetUnpaidDebt2(uint32 elapsed) public {
+        vm.assume(elapsed <= 36500 days);
+        vm.warp(startTs + elapsed);
+
+        uint256 repaid = 30000 * 1e18;
+        uint256 debtBefore = couponBond.getUnpaidDebt(id);
+
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, repaid); // repay only some interest
+
+        uint256 debtAfter = couponBond.getUnpaidDebt(id);
+        assertEq(debtBefore - repaid, debtAfter);
     }
 
     // unpaidDebt should increase as time passes
-    function testGetUnpaidDebt3() public {
-        // TODO:
+    function testGetUnpaidDebt3(uint32 elapsed) public {
+        vm.assume(elapsed <= 36500 days);
+        vm.warp(startTs + elapsed);
+
+        uint256 debtBefore = couponBond.getUnpaidDebt(id);
+        skip(300);
+        uint256 debtAfter = couponBond.getUnpaidDebt(id);
+
+        assertTrue(debtBefore <= debtAfter);
     }
 
-    // unpaidDebt should remain 0 forever after repaid.
-    function testGetUnpaidDebt4() public {
-        // TODO:
+    // unpaidDebt should remain 0 forever after repaying all.
+    function testGetUnpaidDebt4(uint32 elapsed) public {
+        vm.assume(elapsed <= 36500 days);
+        vm.warp(startTs + elapsed);
+
+        usdt.approve(address(couponBond), type(uint256).max);
+        couponBond.repay(id, type(uint256).max);
+
+        uint256 debtBefore = couponBond.getUnpaidDebt(id);
+        skip(300);
+        uint256 debtAfter = couponBond.getUnpaidDebt(id);
+
+        assertEq(debtBefore, debtAfter);
     }
 }
