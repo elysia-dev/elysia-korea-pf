@@ -91,8 +91,7 @@ contract CouponBond is
         if (isRepaid(_id)) revert AlreadyRepaid(_id);
 
         uint256 unpaidDebt = getUnpaidDebt(_id);
-        if (_amount == type(uint256).max) {
-            // FIXME: Add (|| unpaidDebt <= repayingAmount)
+        if (_amount == type(uint256).max || unpaidDebt <= repayingAmount) {
             repayingAmount = unpaidDebt;
         }
 

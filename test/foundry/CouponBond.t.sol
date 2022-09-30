@@ -268,6 +268,23 @@ contract CouponBondTest is Test {
         assertEq(usdt.balanceOf(address(couponBond)), tokenBalance);
     }
 
+    // It should repay the excessive amount.
+    function testRepayMoreThanUnpaidDebt(uint16 elapsed) public {
+        vm.assume(startTs + elapsed < endTs);
+        vm.warp(startTs + elapsed);
+        uint256 repayingAmount = 1e18;
+
+        _initialMint();
+
+        uint256 totalDebt = couponBond.getTotalDebt(id);
+
+        usdt.approve(address(couponBond), type(uint256).max);
+        deal(address(usdt), owner, totalDebt + 100);
+        couponBond.repay(id, totalDebt + 100);
+
+        assertEq(usdt.balanceOf(owner), 100);
+    }
+
     // ********** previewClaim ********** //
     function testPreviewClaimWhenMintedAfterStart(uint16 elapsed) public {
         vm.assume(startTs + elapsed < endTs);
