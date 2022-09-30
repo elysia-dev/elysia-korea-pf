@@ -2,6 +2,18 @@
 pragma solidity 0.8.9;
 
 interface ICouponBond {
+    event ProductAdded(uint256 indexed id);
+    event Repaid(uint256 indexed id, uint256 repayAmount, uint256 leftAmount);
+    event Claimed(uint256 indexed id, uint256 amount);
+
+    error ZeroBalanceClaim();
+    error EarlyClaim(address from, uint256 id);
+    error ZeroBalanceWithdraw(uint256 id);
+    error EarlyWithdraw();
+    error InvalidFinalValue();
+    error NotRepaid(uint256 id);
+    error AlreadyRepaid(uint256 id);
+
     /// @param token                    the token borrowed and to be repaid.
     /// @param value                    value per token in WAD, e.g. $100
     /// @param interestPerSecond        interest rate per token in second. WAD. e.g. 15%
@@ -45,7 +57,7 @@ interface ICouponBond {
     function isOverdue(uint256 _id) external view returns (bool);
 
     /// @notice Calculate how many tokens to receive on claim.
-    function previewClaim(address _lender, uint256 _id)
+    function previewClaim(address _account, uint256 _id)
         external
         view
         returns (uint256);

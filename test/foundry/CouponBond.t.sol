@@ -21,6 +21,7 @@ contract CouponBondTest is Test {
     address owner = address(0x1);
     address alice = address(0x2);
     address bob = address(0x3);
+    address[] addresses = [owner, alice, bob];
 
     mapping(address => uint256) balances;
     mapping(address => uint256) interests;
@@ -54,7 +55,6 @@ contract CouponBondTest is Test {
 
         couponBond = new CouponBond();
         couponBond.addProduct(
-            totalSupply,
             address(usdt),
             principalPerToken, // bsc USDT or BUSD both use decimal 18, each token are worth $100.
             baseInterestPerSecond,
@@ -63,17 +63,24 @@ contract CouponBondTest is Test {
             startTs,
             endTs
         );
+    }
 
+    function _initialMint() private {
+        uint256[] memory initialBalances = new uint256[](3);
+        initialBalances[0] = balances[owner];
+        initialBalances[1] = balances[alice];
+        initialBalances[2] = balances[bob];
+
+        couponBond.mint(id, addresses, initialBalances);
         assertEq(couponBond.totalSupply(id), totalSupply);
-
-        couponBond.safeTransferFrom(owner, alice, id, balances[alice], "");
-        couponBond.safeTransferFrom(owner, bob, id, balances[bob], "");
     }
 
     // ********** Claim ********** //
 
     // N seconds elapsed but it's still before endTs -> claim
     function testClaimBeforeRepayAll(uint64 elapsed) public {
+        _initialMint();
+
         vm.assume(elapsed <= endTs - startTs);
         vm.warp(startTs + elapsed);
 
@@ -91,6 +98,8 @@ contract CouponBondTest is Test {
 
     // The time elapses after endTs -> claim -> repay all -> claim
     function testClaimBeforeAndAfterRepay(uint64 elapsed) public {
+        _initialMint();
+
         vm.assume(elapsed <= 1000000); // no invalid timestamp
         vm.warp(endTs + elapsed);
 
@@ -120,6 +129,8 @@ contract CouponBondTest is Test {
     }
 
     function testBurnTokenWhenClaimAfterRepay() public {
+        _initialMint();
+
         vm.warp(endTs + 100);
         usdt.approve(address(couponBond), type(uint256).max);
         couponBond.repay(id, type(uint256).max);
@@ -131,6 +142,8 @@ contract CouponBondTest is Test {
     }
 
     function testRepayAllBeforeEndTs(uint32 elapsed) public {
+        _initialMint();
+
         uint64 currentTs = startTs + elapsed;
         vm.assume(currentTs < endTs);
         vm.warp(currentTs);
@@ -163,6 +176,8 @@ contract CouponBondTest is Test {
 
     // Check the interest is added when overdue
     function testOverdueRepay(uint64 overdue) public {
+        _initialMint();
+
         vm.assume(overdue < 36500 days);
         vm.warp(endTs + overdue);
         uint64 currentTs = endTs + overdue;
@@ -205,6 +220,8 @@ contract CouponBondTest is Test {
 
     // Scenario: repay all -> claim -> repay all
     function testRepayTwice(uint64 elapsed) public {
+        _initialMint();
+
         vm.assume(elapsed <= 36500 days); // no invalid timestamp
         vm.warp(endTs + elapsed);
 
@@ -221,6 +238,8 @@ contract CouponBondTest is Test {
     }
 
     function testRepayAllBeforeStart() public {
+        _initialMint();
+
         vm.warp(startTs - 100);
         usdt.approve(address(couponBond), type(uint256).max);
         couponBond.repay(id, type(uint256).max);
@@ -235,6 +254,8 @@ contract CouponBondTest is Test {
 
     // Check: Update product.tokenBalance
     function testRepayGivenAmount() public {
+        _initialMint();
+
         vm.warp(startTs + 100);
         uint256 repayingAmount = 1e18;
 
@@ -247,10 +268,40 @@ contract CouponBondTest is Test {
         assertEq(usdt.balanceOf(address(couponBond)), tokenBalance);
     }
 
+    // It should repay the excessive amount.
+    function testRepayMoreThanUnpaidDebt(uint16 elapsed) public {
+        vm.assume(startTs + elapsed < endTs);
+        vm.warp(startTs + elapsed);
+        uint256 repayingAmount = 1e18;
+
+        _initialMint();
+
+        uint256 totalDebt = couponBond.getTotalDebt(id);
+
+        usdt.approve(address(couponBond), type(uint256).max);
+        deal(address(usdt), owner, totalDebt + 100);
+        couponBond.repay(id, totalDebt + 100);
+
+        assertEq(usdt.balanceOf(owner), 100);
+    }
+
+    // ********** previewClaim ********** //
+    function testPreviewClaimWhenMintedAfterStart(uint16 elapsed) public {
+        vm.assume(startTs + elapsed < endTs);
+        vm.warp(startTs + elapsed);
+        _initialMint();
+
+        uint256 interest = baseInterestPerSecond * elapsed;
+
+        assertEq(couponBond.previewClaim(alice, id), interest);
+    }
+
     // ********** getUnclaimedInterest ********** //
 
     // Given 0 < lastUpdatedTs <= startTs
     function testGetUnclaimedInterestBeforeStart(uint64 currentTs) public {
+        _initialMint();
+
         vm.warp(2); // timestamp 1 is used in setUp
         changePrank(alice);
         couponBond.safeTransferFrom(alice, alice, id, 1, ""); // Update lastUpdatedTs
@@ -262,15 +313,22 @@ contract CouponBondTest is Test {
         assertEq(couponBond.getUnclaimedInterest(alice, id), 0);
     }
 
-    function testGetUnclaimedInterestAfterStart(uint32 elapsed) public {
+    // spec: When minted after startTs, unclaimedInterest[_id][_to] should be updated as if it was minted before startTs.
+    function testGetUnclaimedInterestWhenMintedAfterStart(uint32 elapsed)
+        public
+    {
         vm.assume(startTs + elapsed < endTs);
         vm.warp(startTs + elapsed);
+        _initialMint();
+
         uint256 interest = baseInterestPerSecond * elapsed;
         assertEq(couponBond.getUnclaimedInterest(alice, id), interest);
     }
 
     // Overdue
     function testGetUnclaimedInterestAfterEnd(uint64 overdue) public {
+        _initialMint();
+
         vm.assume(overdue < type(uint64).max - endTs);
         vm.warp(endTs + overdue);
         uint64 elapsed = endTs + overdue - startTs;
@@ -283,6 +341,8 @@ contract CouponBondTest is Test {
 
     // Should return only unclaimed interest
     function testGetUnclaimedInterestAfterClaimOnce(uint32 elapsed) public {
+        _initialMint();
+
         vm.assume(startTs + elapsed < endTs);
         vm.warp(startTs + elapsed);
         uint256 interest = baseInterestPerSecond * elapsed;
@@ -347,6 +407,8 @@ contract CouponBondTest is Test {
     // ********** getUnpaidDebt ********** //
     // unpaidDebt should not increase after claim
     function testGetUnpaidDebt1(uint32 elapsed) public {
+        _initialMint();
+
         vm.assume(elapsed <= 36500 days);
         vm.warp(startTs + elapsed);
         usdt.approve(address(couponBond), type(uint256).max);
@@ -361,6 +423,8 @@ contract CouponBondTest is Test {
 
     // unpaidDebt should decrease after repay
     function testGetUnpaidDebt2(uint32 elapsed) public {
+        _initialMint();
+
         vm.assume(elapsed <= 36500 days);
         vm.warp(startTs + elapsed);
 
@@ -376,6 +440,8 @@ contract CouponBondTest is Test {
 
     // unpaidDebt should increase as time passes
     function testGetUnpaidDebt3(uint32 elapsed) public {
+        _initialMint();
+
         vm.assume(elapsed <= 36500 days);
         vm.warp(startTs + elapsed);
 
@@ -388,6 +454,8 @@ contract CouponBondTest is Test {
 
     // unpaidDebt should remain 0 forever after repaying all.
     function testGetUnpaidDebt4(uint32 elapsed) public {
+        _initialMint();
+
         vm.assume(elapsed <= 36500 days);
         vm.warp(startTs + elapsed);
 
