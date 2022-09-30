@@ -12,7 +12,7 @@ contract CouponBondTest is Test {
     uint64 endTs = 1694012400; // 2022-09-07 GMT+0900
     uint256 constant id = 0;
     uint256 principalPerToken = 100 * 1e18;
-    uint256 interestPerSecond =
+    uint256 baseInterestPerSecond =
         (principalPerToken * 30) / (100 * (endTs - startTs));
     uint256 overdueInterestPerSecond =
         (principalPerToken * 3) / (100 * 365 days);
@@ -57,7 +57,7 @@ contract CouponBondTest is Test {
             totalSupply,
             address(usdt),
             principalPerToken, // bsc USDT or BUSD both use decimal 18, each token are worth $100.
-            interestPerSecond,
+            baseInterestPerSecond,
             overdueInterestPerSecond,
             "ipfs://testuri",
             startTs,
@@ -82,11 +82,11 @@ contract CouponBondTest is Test {
 
         couponBond.claim(alice, id);
 
-        assertEq(usdt.balanceOf(alice), interestPerSecond * elapsed); // interest transferred
+        assertEq(usdt.balanceOf(alice), baseInterestPerSecond * elapsed); // interest transferred
         assertEq(couponBond.balanceOf(alice, id), balances[alice]); // Not burned
 
         couponBond.claim(alice, id);
-        assertEq(usdt.balanceOf(alice), interestPerSecond * elapsed); // No duplicate interest
+        assertEq(usdt.balanceOf(alice), baseInterestPerSecond * elapsed); // No duplicate interest
     }
 
     // The time elapses after endTs -> claim -> repay all -> claim
@@ -105,7 +105,7 @@ contract CouponBondTest is Test {
                 overdueInterestPerSecond *
                 (block.timestamp - endTs);
         }
-        uint256 totalInterest = interestPerSecond *
+        uint256 totalInterest = baseInterestPerSecond *
             (block.timestamp - startTs) +
             overdueInterest;
 
@@ -142,9 +142,9 @@ contract CouponBondTest is Test {
         deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
 
         _everybodyClaims();
-        interests[alice] = interestPerSecond * duration * balances[alice];
-        interests[bob] = interestPerSecond * duration * balances[bob];
-        interests[owner] = interestPerSecond * duration * balances[owner];
+        interests[alice] = baseInterestPerSecond * duration * balances[alice];
+        interests[bob] = baseInterestPerSecond * duration * balances[bob];
+        interests[owner] = baseInterestPerSecond * duration * balances[owner];
 
         assertEq(
             usdt.balanceOf(alice),
@@ -176,9 +176,9 @@ contract CouponBondTest is Test {
         deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
 
         _everybodyClaims();
-        uint256 interestPerToken = interestPerSecond *
+        uint256 interestPerToken = baseInterestPerSecond *
             (endTs - startTs) +
-            (interestPerSecond + overdueInterestPerSecond) *
+            (baseInterestPerSecond + overdueInterestPerSecond) *
             overdue;
 
         interests[alice] = interestPerToken * balances[alice];
@@ -265,7 +265,7 @@ contract CouponBondTest is Test {
     function testGetUnclaimedInterestAfterStart(uint32 elapsed) public {
         vm.assume(startTs + elapsed < endTs);
         vm.warp(startTs + elapsed);
-        uint256 interest = interestPerSecond * elapsed;
+        uint256 interest = baseInterestPerSecond * elapsed;
         assertEq(couponBond.getUnclaimedInterest(alice, id), interest);
     }
 
@@ -274,7 +274,7 @@ contract CouponBondTest is Test {
         vm.assume(overdue < type(uint64).max - endTs);
         vm.warp(endTs + overdue);
         uint64 elapsed = endTs + overdue - startTs;
-        uint256 interest = interestPerSecond *
+        uint256 interest = baseInterestPerSecond *
             elapsed +
             overdueInterestPerSecond *
             overdue;
@@ -285,7 +285,7 @@ contract CouponBondTest is Test {
     function testGetUnclaimedInterestAfterClaimOnce(uint32 elapsed) public {
         vm.assume(startTs + elapsed < endTs);
         vm.warp(startTs + elapsed);
-        uint256 interest = interestPerSecond * elapsed;
+        uint256 interest = baseInterestPerSecond * elapsed;
         uint256 skipped = 237; // random
 
         usdt.approve(address(couponBond), type(uint256).max);
@@ -297,7 +297,7 @@ contract CouponBondTest is Test {
         skip(skipped);
         assertEq(
             couponBond.getUnclaimedInterest(alice, id),
-            interestPerSecond * skipped
+            baseInterestPerSecond * skipped
         );
     }
 
@@ -310,15 +310,15 @@ contract CouponBondTest is Test {
     function testGetUnitDebtAfterStartTs(uint32 elapsed) public {
         vm.assume(elapsed <= endTs - startTs);
         vm.warp(startTs + elapsed);
-        uint256 interest = interestPerSecond * elapsed;
+        uint256 interest = baseInterestPerSecond * elapsed;
         assertEq(couponBond.getUnitDebt(id), principalPerToken + interest);
     }
 
     function testGetUnitDebtAfterEndTs(uint32 overdue) public {
         vm.warp(endTs + overdue);
-        uint256 interest = interestPerSecond * (endTs - startTs);
+        uint256 interest = baseInterestPerSecond * (endTs - startTs);
         uint256 overdueInterest = (overdueInterestPerSecond +
-            interestPerSecond) * overdue;
+            baseInterestPerSecond) * overdue;
         assertEq(
             couponBond.getUnitDebt(id),
             principalPerToken + interest + overdueInterest
@@ -329,7 +329,7 @@ contract CouponBondTest is Test {
     function testGetUnitDebtAfterRepaid(uint32 elapsed) public {
         vm.assume(elapsed <= endTs - startTs);
         vm.warp(startTs + elapsed);
-        uint256 interest = interestPerSecond * elapsed;
+        uint256 interest = baseInterestPerSecond * elapsed;
         uint256 totalUnpaidDebt = couponBond.getUnpaidDebt(id);
         assertEq(
             totalUnpaidDebt,

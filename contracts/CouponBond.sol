@@ -49,7 +49,7 @@ contract CouponBond is
         uint256 _initialSupply,
         address _token,
         uint256 _value,
-        uint256 _interestPerSecond,
+        uint256 _baseInterestPerSecond,
         uint256 _overdueInterestPerSecond,
         string memory _uri,
         uint64 _startTs,
@@ -58,7 +58,7 @@ contract CouponBond is
         Product memory newProduct = Product({
             token: _token,
             value: _value,
-            interestPerSecond: _interestPerSecond,
+            baseInterestPerSecond: _baseInterestPerSecond,
             overdueInterestPerSecond: _overdueInterestPerSecond,
             uri: _uri,
             totalRepaid: 0,
@@ -130,13 +130,16 @@ contract CouponBond is
     }
 
     // ********** view ********** //
-
     function uri(uint256 _id) public view override returns (string memory) {
         return products[_id].uri;
     }
 
     function isRepaid(uint256 _id) public view override returns (bool) {
         return products[_id].repaidTs != 0;
+    }
+
+    function isOverdue(uint256 _id) public view override returns (bool) {
+        return products[_id].endTs < block.timestamp;
     }
 
     function previewClaim(address _lender, uint256 _id)
@@ -166,7 +169,7 @@ contract CouponBond is
         return
             product.value +
             _calculateInterest(
-                product.interestPerSecond,
+                product.baseInterestPerSecond,
                 product.overdueInterestPerSecond,
                 product.startTs, // calculate from the start
                 product.endTs,
@@ -233,7 +236,7 @@ contract CouponBond is
         return
             balanceOf(_to, _id) *
             _calculateInterest(
-                product.interestPerSecond,
+                product.baseInterestPerSecond,
                 product.overdueInterestPerSecond,
                 userLastUpdatedTs,
                 product.endTs,

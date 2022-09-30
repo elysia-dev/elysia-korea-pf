@@ -14,7 +14,7 @@ interface ICouponBond {
     struct Product {
         address token;
         uint256 value;
-        uint256 interestPerSecond;
+        uint256 baseInterestPerSecond;
         uint256 overdueInterestPerSecond;
         string uri;
         uint256 totalRepaid;
@@ -22,17 +22,6 @@ interface ICouponBond {
         uint64 endTs;
         uint64 repaidTs;
     }
-
-    function addProduct(
-        uint256 _initialSupply,
-        address _token,
-        uint256 _value,
-        uint256 _interestPerSecond,
-        uint256 _overdueInterestPerSecond,
-        string memory _uri,
-        uint64 _startTs,
-        uint64 _endTs
-    ) external;
 
     /// @dev It is not able to repay after fully repaying the loan.
     /// The caller need to approve the repaying token.
@@ -51,6 +40,9 @@ interface ICouponBond {
     // ********** view ********** //
     /// @notice Show whether the loan is repaid.
     function isRepaid(uint256 _id) external view returns (bool);
+
+    /// @notice Show whether the loan has not been repaid on time.
+    function isOverdue(uint256 _id) external view returns (bool);
 
     /// @notice Calculate how many tokens to receive on claim.
     function previewClaim(address _lender, uint256 _id)
