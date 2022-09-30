@@ -1,4 +1,5 @@
-import { ethers } from "ethers";
+import { CouponBond } from "../typechain-types";
+import { ethers, Event } from "ethers";
 import { task } from "hardhat/config";
 
 const addProduct = task(
@@ -7,11 +8,15 @@ const addProduct = task(
 ).setAction(async function (taskArgs, hre) {
   const deployment = await hre.deployments.get("CouponBond");
   const usdt = await hre.deployments.get("Usdt");
+  const { deployer } = await hre.getNamedAccounts();
+  const [test1, test2] = await hre.getUnnamedAccounts();
+  console.log("deployer: ", deployer);
+  console.log(test1, test2);
 
-  const bulletBond = await hre.ethers.getContractAt(
+  const couponBond = (await hre.ethers.getContractAt(
     deployment.abi,
     deployment.address
-  );
+  )) as CouponBond;
 
   const value = ethers.utils.parseEther("100");
   const startTs = 1662562800;
@@ -19,7 +24,6 @@ const addProduct = task(
   const SECONDS_PER_YEAR = 365 * 86400;
 
   const arg = {
-    initialSupply: 1000,
     token: usdt.address,
     value,
     interesPerSecond: value.mul(30).div(100 * (endTs - startTs)), // 30%
@@ -29,8 +33,8 @@ const addProduct = task(
     endTs,
   } as const;
 
-  const tx = await bulletBond.addProduct(
-    arg.initialSupply,
+  // 1. Add product
+  const tx = await couponBond.addProduct(
     arg.token,
     arg.value,
     arg.interesPerSecond,
@@ -40,7 +44,20 @@ const addProduct = task(
     arg.endTs
   );
 
-  await tx.wait();
+  const receipt = await tx.wait();
+  const events = receipt.events?.filter((x: Event) => {
+    x.event === "ProductAdded";
+  });
+  console.log(events);
+
+  // 2. Mint NFTs to test accounts
+  const id = 0;
+  const initialSupply = 1000;
+  await couponBond.mint(
+    id,
+    [deployer, test1, test2],
+    [initialSupply - 100, 37, 63]
+  );
 });
 
 export default addProduct;

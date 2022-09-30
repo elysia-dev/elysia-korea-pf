@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/ICouponBond.sol";
 
-// import "../lib/forge-std/src/console2.sol";
+// import "../lib/forge-std/src/console.sol";
 
 /// @notice This repays the interest monthly. At the maturity date, lenders receive the principal and one-month interest.
 contract CouponBond is
@@ -20,14 +20,6 @@ contract CouponBond is
     Ownable
 {
     using SafeERC20 for IERC20;
-
-    error ZeroBalanceClaim();
-    error EarlyClaim(address _from, uint256 _id);
-    error ZeroBalanceWithdraw(uint256 _id);
-    error EarlyWithdraw();
-    error InvalidFinalValue();
-    error NotRepaid(uint256 _id);
-    error AlreadyRepaid(uint256 _id);
 
     mapping(uint256 => Product) public products;
     uint256 public numProducts;
@@ -46,7 +38,6 @@ contract CouponBond is
     }
 
     function addProduct(
-        uint256 _initialSupply,
         address _token,
         uint256 _value,
         uint256 _baseInterestPerSecond,
@@ -68,8 +59,24 @@ contract CouponBond is
         });
         products[numProducts] = newProduct;
 
-        _mint(owner(), numProducts, _initialSupply, "");
         numProducts++;
+
+        emit ProductAdded(numProducts - 1);
+    }
+
+    function mint(
+        uint256 _id,
+        address[] memory _addresses,
+        uint256[] memory _amounts
+    ) external onlyOwner {
+        for (uint256 i = 0; i < _addresses.length; ++i) {
+            address to = _addresses[i];
+            _updateInterestBeforeMint(to, _id, _amounts[i]);
+        }
+
+        for (uint256 i = 0; i < _addresses.length; ++i) {
+            _mint(_addresses[i], _id, _amounts[i], "");
+        }
     }
 
     function setURI(uint256 _id, string memory _uri) external onlyOwner {
@@ -85,6 +92,7 @@ contract CouponBond is
 
         uint256 unpaidDebt = getUnpaidDebt(_id);
         if (_amount == type(uint256).max) {
+            // FIXME: Add (|| unpaidDebt <= repayingAmount)
             repayingAmount = unpaidDebt;
         }
 
@@ -99,6 +107,8 @@ contract CouponBond is
             address(this),
             repayingAmount
         );
+
+        emit Repaid(_id, repayingAmount, unpaidDebt - repayingAmount);
     }
 
     /// @inheritdoc ICouponBond
@@ -127,6 +137,8 @@ contract CouponBond is
         // lastUpdatedTs[_id][_to] = block.timestamp;
 
         IERC20(product.token).safeTransfer(_to, receiveAmount);
+
+        emit Claimed(_id, receiveAmount);
     }
 
     // ********** view ********** //
@@ -142,7 +154,7 @@ contract CouponBond is
         return products[_id].endTs < block.timestamp;
     }
 
-    function previewClaim(address _lender, uint256 _id)
+    function previewClaim(address _account, uint256 _id)
         external
         view
         override
@@ -150,11 +162,11 @@ contract CouponBond is
     {
         if (isRepaid(_id)) {
             return
-                balanceOf(_lender, _id) *
+                balanceOf(_account, _id) *
                 products[_id].value +
-                getUnclaimedInterest(_lender, _id);
+                getUnclaimedInterest(_account, _id);
         } else {
-            return getUnclaimedInterest(_lender, _id);
+            return getUnclaimedInterest(_account, _id);
         }
     }
 
@@ -194,6 +206,20 @@ contract CouponBond is
     }
 
     // ****** internal ****** //
+    function _updateInterestBeforeMint(
+        address _to,
+        uint256 _id,
+        uint256 _amount
+    ) internal {
+        Product storage product = products[_id];
+
+        if (product.startTs < block.timestamp) {
+            unclaimedInterest[_id][_to] =
+                _amount *
+                (getUnitDebt(_id) - product.value);
+            lastUpdatedTs[_id][_to] = block.timestamp;
+        }
+    }
 
     function _beforeTokenTransfer(
         address operator,
