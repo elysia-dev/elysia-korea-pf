@@ -69,7 +69,7 @@ contract CouponBondTest is Test {
         initialBalances[1] = balances[alice];
         initialBalances[2] = balances[bob];
 
-        couponBond.mint(id, addresses, initialBalances);
+        couponBond.mintBatch(id, addresses, initialBalances);
         assertEq(couponBond.totalSupply(id), totalSupply);
     }
 
