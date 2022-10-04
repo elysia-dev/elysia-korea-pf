@@ -57,7 +57,7 @@ const addProduct = task("addCouponProduct", "Add a CouponBond product")
       console.log(test1, test2);
       const id = 0;
       const initialSupply = 1000;
-      await couponBond.mint(
+      await couponBond.mintBatch(
         id,
         [deployer, test1, test2],
         [initialSupply - 100, 37, 63]

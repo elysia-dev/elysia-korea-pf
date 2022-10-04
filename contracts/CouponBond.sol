@@ -21,7 +21,7 @@ contract CouponBond is ICouponBond, ERC1155Supply, ERC1155Burnable, ERC1155Pausa
     mapping(uint256 => mapping(address => uint256)) public lastUpdatedTs;
     mapping(uint256 => mapping(address => uint256)) public unclaimedInterest;
 
-    constructor() ERC1155("") Pausable {}
+    constructor() ERC1155("") Pausable() {}
 
     function pause() external onlyOwner {
         _pause();
@@ -61,7 +61,7 @@ contract CouponBond is ICouponBond, ERC1155Supply, ERC1155Burnable, ERC1155Pausa
         emit ProductAdded(numProducts - 1);
     }
 
-    function mint(uint256 _id, address[] memory _addresses, uint256[] memory _amounts) external onlyOwner {
+    function mintBatch(uint256 _id, address[] memory _addresses, uint256[] memory _amounts) external onlyOwner {
         for (uint256 i = 0; i < _addresses.length; ++i) {
             address to = _addresses[i];
             _updateInterestBeforeMint(to, _id, _amounts[i]);
