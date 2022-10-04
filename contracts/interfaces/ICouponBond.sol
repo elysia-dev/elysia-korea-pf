@@ -57,10 +57,7 @@ interface ICouponBond {
     function isOverdue(uint256 _id) external view returns (bool);
 
     /// @notice Calculate how many tokens to receive on claim.
-    function previewClaim(address _account, uint256 _id)
-        external
-        view
-        returns (uint256);
+    function previewClaim(address _account, uint256 _id) external view returns (uint256);
 
     /// @notice Calculate the total debt regardless of the repaid amount.
     function getTotalDebt(uint256 _id) external view returns (uint256);
@@ -70,10 +67,7 @@ interface ICouponBond {
     function getUnitDebt(uint256 _id) external view returns (uint256);
 
     /// @notice Calculate unclaimed interest
-    function getUnclaimedInterest(address _to, uint256 _id)
-        external
-        view
-        returns (uint256);
+    function getUnclaimedInterest(address _to, uint256 _id) external view returns (uint256);
 
     /// @notice Calculate the debt value to be fully repaid.
     function getUnpaidDebt(uint256 _id) external view returns (uint256);

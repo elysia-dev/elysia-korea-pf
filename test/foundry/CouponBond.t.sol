@@ -12,10 +12,8 @@ contract CouponBondTest is Test {
     uint64 endTs = 1694012400; // 2022-09-07 GMT+0900
     uint256 constant id = 0;
     uint256 principalPerToken = 100 * 1e18;
-    uint256 baseInterestPerSecond =
-        (principalPerToken * 30) / (100 * (endTs - startTs));
-    uint256 overdueInterestPerSecond =
-        (principalPerToken * 3) / (100 * 365 days);
+    uint256 baseInterestPerSecond = (principalPerToken * 30) / (100 * (endTs - startTs));
+    uint256 overdueInterestPerSecond = (principalPerToken * 3) / (100 * 365 days);
     uint256 totalSupply = 1000;
 
     address owner = address(0x1);
@@ -110,13 +108,9 @@ contract CouponBondTest is Test {
 
         uint256 overdueInterest = 0;
         if (endTs < block.timestamp) {
-            overdueInterest =
-                overdueInterestPerSecond *
-                (block.timestamp - endTs);
+            overdueInterest = overdueInterestPerSecond * (block.timestamp - endTs);
         }
-        uint256 totalInterest = baseInterestPerSecond *
-            (block.timestamp - startTs) +
-            overdueInterest;
+        uint256 totalInterest = baseInterestPerSecond * (block.timestamp - startTs) + overdueInterest;
 
         // receive only interest
         assertEq(usdt.balanceOf(alice), totalInterest);
@@ -159,18 +153,9 @@ contract CouponBondTest is Test {
         interests[bob] = baseInterestPerSecond * duration * balances[bob];
         interests[owner] = baseInterestPerSecond * duration * balances[owner];
 
-        assertEq(
-            usdt.balanceOf(alice),
-            interests[alice] + balances[alice] * principalPerToken
-        );
-        assertEq(
-            usdt.balanceOf(bob),
-            interests[bob] + balances[bob] * principalPerToken
-        );
-        assertEq(
-            usdt.balanceOf(owner),
-            interests[owner] + balances[owner] * principalPerToken
-        );
+        assertEq(usdt.balanceOf(alice), interests[alice] + balances[alice] * principalPerToken);
+        assertEq(usdt.balanceOf(bob), interests[bob] + balances[bob] * principalPerToken);
+        assertEq(usdt.balanceOf(owner), interests[owner] + balances[owner] * principalPerToken);
         assertEq(usdt.balanceOf(address(couponBond)), 0);
     }
 
@@ -191,27 +176,16 @@ contract CouponBondTest is Test {
         deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
 
         _everybodyClaims();
-        uint256 interestPerToken = baseInterestPerSecond *
-            (endTs - startTs) +
-            (baseInterestPerSecond + overdueInterestPerSecond) *
-            overdue;
+        uint256 interestPerToken =
+            baseInterestPerSecond * (endTs - startTs) + (baseInterestPerSecond + overdueInterestPerSecond) * overdue;
 
         interests[alice] = interestPerToken * balances[alice];
         interests[bob] = interestPerToken * balances[bob];
         interests[owner] = interestPerToken * balances[owner];
 
-        assertEq(
-            usdt.balanceOf(alice),
-            interests[alice] + balances[alice] * principalPerToken
-        );
-        assertEq(
-            usdt.balanceOf(bob),
-            interests[bob] + balances[bob] * principalPerToken
-        );
-        assertEq(
-            usdt.balanceOf(owner),
-            interests[owner] + balances[owner] * principalPerToken
-        );
+        assertEq(usdt.balanceOf(alice), interests[alice] + balances[alice] * principalPerToken);
+        assertEq(usdt.balanceOf(bob), interests[bob] + balances[bob] * principalPerToken);
+        assertEq(usdt.balanceOf(owner), interests[owner] + balances[owner] * principalPerToken);
 
         _everybodyClaims();
     }
@@ -244,10 +218,7 @@ contract CouponBondTest is Test {
         usdt.approve(address(couponBond), type(uint256).max);
         couponBond.repay(id, type(uint256).max);
 
-        assertEq(
-            usdt.balanceOf(address(couponBond)),
-            totalSupply * principalPerToken
-        );
+        assertEq(usdt.balanceOf(address(couponBond)), totalSupply * principalPerToken);
 
         _everybodyClaims();
     }
@@ -262,7 +233,7 @@ contract CouponBondTest is Test {
         usdt.approve(address(couponBond), type(uint256).max);
         couponBond.repay(id, repayingAmount);
 
-        (, , , , , uint256 tokenBalance, , , ) = couponBond.products(id);
+        (,,,,, uint256 tokenBalance,,,) = couponBond.products(id);
 
         assertEq(usdt.balanceOf(address(couponBond)), repayingAmount);
         assertEq(usdt.balanceOf(address(couponBond)), tokenBalance);
@@ -314,9 +285,7 @@ contract CouponBondTest is Test {
     }
 
     // spec: When minted after startTs, unclaimedInterest[_id][_to] should be updated as if it was minted before startTs.
-    function testGetUnclaimedInterestWhenMintedAfterStart(uint32 elapsed)
-        public
-    {
+    function testGetUnclaimedInterestWhenMintedAfterStart(uint32 elapsed) public {
         vm.assume(startTs + elapsed < endTs);
         vm.warp(startTs + elapsed);
         _initialMint();
@@ -332,10 +301,7 @@ contract CouponBondTest is Test {
         vm.assume(overdue < type(uint64).max - endTs);
         vm.warp(endTs + overdue);
         uint64 elapsed = endTs + overdue - startTs;
-        uint256 interest = baseInterestPerSecond *
-            elapsed +
-            overdueInterestPerSecond *
-            overdue;
+        uint256 interest = baseInterestPerSecond * elapsed + overdueInterestPerSecond * overdue;
         assertEq(couponBond.getUnclaimedInterest(alice, id), interest);
     }
 
@@ -355,10 +321,7 @@ contract CouponBondTest is Test {
         assertEq(couponBond.getUnclaimedInterest(alice, id), 0);
 
         skip(skipped);
-        assertEq(
-            couponBond.getUnclaimedInterest(alice, id),
-            baseInterestPerSecond * skipped
-        );
+        assertEq(couponBond.getUnclaimedInterest(alice, id), baseInterestPerSecond * skipped);
     }
 
     // ********** getUnitDebt ********** //
@@ -377,12 +340,8 @@ contract CouponBondTest is Test {
     function testGetUnitDebtAfterEndTs(uint32 overdue) public {
         vm.warp(endTs + overdue);
         uint256 interest = baseInterestPerSecond * (endTs - startTs);
-        uint256 overdueInterest = (overdueInterestPerSecond +
-            baseInterestPerSecond) * overdue;
-        assertEq(
-            couponBond.getUnitDebt(id),
-            principalPerToken + interest + overdueInterest
-        );
+        uint256 overdueInterest = (overdueInterestPerSecond + baseInterestPerSecond) * overdue;
+        assertEq(couponBond.getUnitDebt(id), principalPerToken + interest + overdueInterest);
     }
 
     // getUnitDebt does not change after repaid.
@@ -391,10 +350,7 @@ contract CouponBondTest is Test {
         vm.warp(startTs + elapsed);
         uint256 interest = baseInterestPerSecond * elapsed;
         uint256 totalUnpaidDebt = couponBond.getUnpaidDebt(id);
-        assertEq(
-            totalUnpaidDebt,
-            couponBond.totalSupply(id) * (interest + principalPerToken)
-        );
+        assertEq(totalUnpaidDebt, couponBond.totalSupply(id) * (interest + principalPerToken));
 
         usdt.approve(address(couponBond), type(uint256).max);
         couponBond.repay(id, totalUnpaidDebt);

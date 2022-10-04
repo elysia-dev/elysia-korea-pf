@@ -49,15 +49,12 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
         string memory _uri,
         uint64 _startTs,
         uint64 _endTs
-    ) external onlyOwner {
-        Product memory newProduct = Product({
-            token: _token,
-            value: _value,
-            finalValue: 0,
-            uri: _uri,
-            startTs: _startTs,
-            endTs: _endTs
-        });
+    )
+        external
+        onlyOwner
+    {
+        Product memory newProduct =
+            Product({token: _token, value: _value, finalValue: 0, uri: _uri, startTs: _startTs, endTs: _endTs});
         products[numProducts] = newProduct;
 
         _mint(owner(), numProducts, _initialSupply, "");
@@ -73,32 +70,30 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
     }
 
     /// @notice Admin repays to let users claim. You can repay several times because all `_finalValue`s are summed up.
-    function repay(
-        uint256 _id,
-        uint256 _finalValue,
-        uint256 _totalFinalValue
-    ) external whenNotPaused onlyOwner {
+    function repay(uint256 _id, uint256 _finalValue, uint256 _totalFinalValue) external whenNotPaused onlyOwner {
         Product storage product = products[_id];
-        if (_finalValue * totalSupply(_id) != _totalFinalValue)
+        if (_finalValue * totalSupply(_id) != _totalFinalValue) {
             revert InvalidFinalValue();
+        }
         product.finalValue += _finalValue;
 
-        IERC20(product.token).safeTransferFrom(
-            _msgSender(),
-            address(this),
-            _totalFinalValue
-        );
+        IERC20(product.token).safeTransferFrom(_msgSender(), address(this), _totalFinalValue);
     }
 
     /// @notice Nft holders claim their interest and principal.
     function claim(address _to, uint256 _id) external whenNotPaused {
         Product storage product = products[_id];
-        if (product.finalValue == 0) revert NotRepaid(_id);
-        if (block.timestamp < product.endTs)
+        if (product.finalValue == 0) {
+            revert NotRepaid(_id);
+        }
+        if (block.timestamp < product.endTs) {
             revert EarlyClaim(_msgSender(), _id);
+        }
 
         uint256 balance = balanceOf(_to, _id);
-        if (balance == 0) revert ZeroBalanceClaim();
+        if (balance == 0) {
+            revert ZeroBalanceClaim();
+        }
         _burn(_to, _id, balance);
 
         uint256 receiveAmount = product.finalValue * balance;
@@ -112,11 +107,17 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
     /// 2. The user claims.
     function withdrawResidue(uint256 _id) external onlyOwner {
         Product storage product = products[_id];
-        if (product.finalValue == 0) revert NotRepaid(_id);
-        if (block.timestamp < product.endTs + 8 weeks) revert EarlyWithdraw();
+        if (product.finalValue == 0) {
+            revert NotRepaid(_id);
+        }
+        if (block.timestamp < product.endTs + 8 weeks) {
+            revert EarlyWithdraw();
+        }
 
         uint256 balance = totalSupply(_id);
-        if (balance == 0) revert ZeroBalanceWithdraw(_id);
+        if (balance == 0) {
+            revert ZeroBalanceWithdraw(_id);
+        }
 
         uint256 withdrawAmount = product.finalValue * balance;
         IERC20(product.token).safeTransfer(owner(), withdrawAmount);
@@ -129,7 +130,12 @@ contract BulletBond is ERC1155Supply, ERC1155Burnable, Ownable, Pausable {
         uint256[] memory ids,
         uint256[] memory amounts,
         bytes memory data
-    ) internal virtual override(ERC1155, ERC1155Supply) whenNotPaused {
+    )
+        internal
+        virtual
+        override (ERC1155, ERC1155Supply)
+        whenNotPaused
+    {
         // Use ERC1155Supply._beforeTokenTransfer
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
