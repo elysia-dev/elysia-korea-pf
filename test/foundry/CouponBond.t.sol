@@ -145,7 +145,7 @@ contract CouponBondTest is Test {
         uint256 duration = currentTs - startTs;
 
         usdt.approve(address(couponBond), type(uint256).max);
-        couponBond.repay(id, type(uint256).max);
+        couponBond.repay(id, 140000 * 1e18);
         deal(address(usdt), owner, 0); // set the owner's usdt balance as 0
 
         _everybodyClaims();
