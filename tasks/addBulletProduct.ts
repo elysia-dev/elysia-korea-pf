@@ -17,7 +17,7 @@ const addProduct = task(
     initialSupply: 1000,
     token: usdt.address,
     value: ethers.utils.parseEther("100"),
-    uri: "ipfs://Qmdkh5Ur1ECdGMDXX9QKHJpiToZxUkCEe9MPMHhDyUNtbE",
+    uri: "ipfs://QmZ4moQm38hSoLW7mMjQtXmvX2CVv1jjmAM39Us7Zug69T",
     startTs: 1662562800,
     endTs: 1694012400,
   };
